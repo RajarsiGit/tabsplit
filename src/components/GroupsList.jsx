@@ -104,9 +104,9 @@ export default function GroupsList() {
                 to={`/groups/${group.id}`}
                 className="block rounded-lg border border-gray-200 bg-white p-4 hover:border-brand-300 hover:shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">{group.name}</span>
-                  <span className="text-xs text-gray-500">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <span className="min-w-0 truncate font-semibold">{group.name}</span>
+                  <span className="shrink-0 text-xs text-gray-500">
                     {group.member_count} member{group.member_count === "1" ? "" : "s"}
                   </span>
                 </div>

@@ -29,8 +29,8 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
           {members.map((m) => {
             const balance = balances[m.id] ?? 0;
             return (
-              <li key={m.id} className="flex items-center justify-between">
-                <span>{m.name}</span>
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="min-w-0 truncate">{m.name}</span>
                 {balance > 0.01 ? (
                   <span className="text-green-600">is owed {formatCurrency(balance, currency)}</span>
                 ) : balance < -0.01 ? (
@@ -61,7 +61,7 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
         ) : (
           <ul className="space-y-2 text-sm">
             {settleUp.map((t, i) => (
-              <li key={i} className="flex items-center justify-between">
+              <li key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <span>
                   <strong>{memberName(members, t.from)}</strong> owes{" "}
                   <strong>{memberName(members, t.to)}</strong> {formatCurrency(t.amount, currency)}
@@ -69,7 +69,7 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
                 <button
                   type="button"
                   onClick={() => openForm({ from: t.from, to: t.to, amount: t.amount })}
-                  className="text-brand-600 hover:underline"
+                  className="shrink-0 text-brand-600 hover:underline"
                 >
                   Settle
                 </button>

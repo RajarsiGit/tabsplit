@@ -41,8 +41,8 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
         Recurring expenses are split equally among all current group members each time they run.
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
           <label htmlFor="recurring-description" className="mb-1 block text-sm font-medium text-gray-700">
             Description
           </label>

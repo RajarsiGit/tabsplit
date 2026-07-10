@@ -63,13 +63,13 @@ export default function GroupDetail() {
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <div className="mb-6 flex gap-1 border-b border-gray-200">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-gray-200">
         {TABS.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`px-3 py-2 text-sm font-medium ${
+            className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium ${
               tab === t
                 ? "border-b-2 border-brand-600 text-brand-600"
                 : "text-gray-500 hover:text-gray-700"
@@ -112,15 +112,15 @@ export default function GroupDetail() {
               {expenses.map((exp) => (
                 <li
                   key={exp.id}
-                  className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4"
+                  className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div>
-                    <p className="font-medium">{exp.description}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{exp.description}</p>
                     <p className="text-xs text-gray-500">
                       {exp.expense_date} &middot; {exp.category} &middot; paid by {exp.paid_by_name}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
                     <span className="font-semibold">{formatCurrency(exp.amount, group.currency)}</span>
                     <button
                       type="button"
@@ -169,16 +169,16 @@ export default function GroupDetail() {
               {recurring.map((r) => (
                 <li
                   key={r.id}
-                  className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4"
+                  className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div>
-                    <p className="font-medium">{r.description}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{r.description}</p>
                     <p className="text-xs text-gray-500">
                       {r.frequency} &middot; {r.category} &middot; paid by {r.paid_by_name} &middot; next on{" "}
                       {r.next_occurrence}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
                     <span className="font-semibold">{formatCurrency(r.amount, group.currency)}</span>
                     <button
                       type="button"
@@ -216,13 +216,13 @@ export default function GroupDetail() {
             {group.members.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4"
+                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4"
               >
-                <div>
-                  <p className="font-medium">{m.name}</p>
-                  <p className="text-xs text-gray-500">{m.email}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{m.name}</p>
+                  <p className="truncate text-xs text-gray-500">{m.email}</p>
                 </div>
-                <span className="text-xs uppercase text-gray-400">{m.role}</span>
+                <span className="shrink-0 text-xs uppercase text-gray-400">{m.role}</span>
               </li>
             ))}
           </ul>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-TabSplit is a lightweight alternative to Splitwise for splitting recurring shared expenses (roommates, trips). Vite + React frontend, Tailwind CSS, Vercel serverless functions, Neon Postgres. Architecture mirrors `smart-task-manager` (cookie-based JWT auth, `@neondatabase/serverless`, one handler file per resource under `api/`).
+TabSplit is a lightweight alternative to Splitwise for splitting recurring shared expenses (roommates, trips). Vite + React frontend, Tailwind CSS, Vercel serverless functions, Neon Postgres. Architecture mirrors `smart-task-manager` (cookie-based JWT auth, `@neondatabase/serverless`, one handler file per resource under `api/`). Licensed under GPL-3.0-or-later (see `LICENSE`).
 
 ## Commands
 

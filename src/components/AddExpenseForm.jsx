@@ -66,8 +66,8 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
           <label htmlFor="expense-description" className="mb-1 block text-sm font-medium text-gray-700">
             Description
           </label>
@@ -174,13 +174,13 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
         <div className="space-y-2">
           {members.map((m) => (
             <div key={m.id} className="flex items-center gap-3">
-              <label className="flex flex-1 items-center gap-2 text-sm">
+              <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={selected.has(m.id)}
                   onChange={() => toggleMember(m.id)}
                 />
-                {m.name}
+                <span className="truncate">{m.name}</span>
               </label>
               {splitType === "exact" && selected.has(m.id) && (
                 <input
@@ -192,7 +192,7 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
                   onChange={(e) =>
                     setExactAmounts((prev) => ({ ...prev, [m.id]: e.target.value }))
                   }
-                  className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  className="w-20 shrink-0 rounded-md border border-gray-300 px-2 py-1 text-sm sm:w-24"
                 />
               )}
             </div>

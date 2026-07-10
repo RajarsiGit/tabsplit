@@ -176,4 +176,4 @@ See [CLAUDE.md](./CLAUDE.md) for a deeper architecture reference, data model not
 
 ## License
 
-MIT
+TabSplit is licensed under the [GNU General Public License v3.0](LICENSE) (or, at your option, any later version).

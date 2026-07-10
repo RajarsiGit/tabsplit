@@ -47,6 +47,7 @@ export default function AuthScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+        <img src="/favicon.svg" alt="" className="mx-auto mb-3 h-12 w-12" />
         <h1 className="mb-1 text-center text-2xl font-bold text-brand-600">TabSplit</h1>
         <p className="mb-6 text-center text-sm text-gray-500">
           {isLogin ? "Login to your TabSplit account" : "Create your TabSplit account"}
