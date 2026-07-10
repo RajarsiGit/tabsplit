@@ -26,6 +26,7 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 
 - **Authentication**
   - Email/password login with bcrypt-hashed passwords
+  - "Continue with GitHub" OAuth login (links to an existing account by email, or creates a new one)
   - JWT stored in an HTTP-only cookie (7-day session)
 
 ## Getting Started
@@ -52,6 +53,11 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
    ```
    DATABASE_URL=your_neon_connection_string
    JWT_SECRET=your_secure_random_string
+   ```
+   To enable "Continue with GitHub", create an [OAuth App](https://github.com/settings/developers) with callback URL `<your-app-url>/api/auth/github/callback` and fill in:
+   ```
+   GITHUB_CLIENT_ID=your_github_oauth_client_id
+   GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
    ```
 
 3. **Initialize the database:**
@@ -153,7 +159,7 @@ src/
 └── index.css                     # Tailwind entry point
 api/
 ├── db.js                         # Neon client, auth/cookie helpers, requireGroupMember
-├── auth.js                       # register/login/logout/me
+├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
 ├── groups.js                     # Group CRUD + membership + balances/settleUp
 ├── expenses.js                   # Expense CRUD + split calculation
 ├── recurring.js                  # Recurring expense template CRUD

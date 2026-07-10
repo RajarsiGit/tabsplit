@@ -1,14 +1,20 @@
 -- TabSplit Database Schema for Neon Postgres
 
 -- Users table
+-- password is nullable because GitHub-only accounts have no local password
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
+  password VARCHAR(255),
+  github_id VARCHAR(255) UNIQUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Safe to re-run against a database created before GitHub login was added
+ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(255) UNIQUE;
 
 -- Groups table (a household or trip that shares expenses)
 CREATE TABLE IF NOT EXISTS groups (

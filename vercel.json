@@ -21,6 +21,14 @@
       "destination": "/api/auth?path=me"
     },
     {
+      "source": "/api/auth/github/callback",
+      "destination": "/api/auth?path=github/callback"
+    },
+    {
+      "source": "/api/auth/github",
+      "destination": "/api/auth?path=github"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },

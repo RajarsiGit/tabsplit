@@ -24,6 +24,7 @@ export const authApi = {
     request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
+  githubLoginUrl: `${BASE_URL}/auth/github`,
 };
 
 export const groupsApi = {

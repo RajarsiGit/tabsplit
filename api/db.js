@@ -20,13 +20,42 @@ export function getDb() {
   return sql;
 }
 
-function parseCookies(req) {
+export function parseCookies(req) {
   return (
     req.headers.cookie?.split(";").reduce((acc, cookie) => {
       const [key, value] = cookie.trim().split("=");
       acc[key] = value;
       return acc;
     }, {}) || {}
+  );
+}
+
+// Adds a Set-Cookie header without clobbering one already set on this response
+// (e.g. the callback route sets the auth cookie and clears the OAuth state cookie together).
+function appendSetCookie(res, cookieStr) {
+  const existing = res.getHeader("Set-Cookie");
+  if (!existing) {
+    res.setHeader("Set-Cookie", cookieStr);
+  } else if (Array.isArray(existing)) {
+    res.setHeader("Set-Cookie", [...existing, cookieStr]);
+  } else {
+    res.setHeader("Set-Cookie", [existing, cookieStr]);
+  }
+}
+
+export const OAUTH_STATE_COOKIE_NAME = "github_oauth_state";
+
+export function setOAuthStateCookie(res, state) {
+  appendSetCookie(
+    res,
+    `${OAUTH_STATE_COOKIE_NAME}=${state}; HttpOnly; Path=/; Max-Age=300; SameSite=Lax`
+  );
+}
+
+export function clearOAuthStateCookie(res) {
+  appendSetCookie(
+    res,
+    `${OAUTH_STATE_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
   );
 }
 
@@ -51,15 +80,15 @@ export function signToken(payload) {
 }
 
 export function setAuthCookie(res, token) {
-  res.setHeader(
-    "Set-Cookie",
+  appendSetCookie(
+    res,
     `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`
   );
 }
 
 export function clearAuthCookie(res) {
-  res.setHeader(
-    "Set-Cookie",
+  appendSetCookie(
+    res,
     `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
   );
 }

@@ -21,11 +21,13 @@ npm run preview      # Preview production build
 DATABASE_URL=postgresql://...   # Neon Postgres connection string
 JWT_SECRET=your_secret_key      # Secret for JWT signing
 CRON_SECRET=                    # Set automatically by Vercel Cron; used to authorize api/cron/process-recurring
+GITHUB_CLIENT_ID=               # GitHub OAuth App, for "Continue with GitHub" login
+GITHUB_CLIENT_SECRET=           # callback URL must be <app-url>/api/auth/github/callback
 ```
 
 ## Data Model
 
-- `users` — id, name, email, password (bcrypt hash)
+- `users` — id, name, email, password (bcrypt hash, nullable for GitHub-only accounts), github_id (nullable, unique)
 - `groups` — a household or trip; `currency` defaults to USD
 - `group_members` — join table, `role` is `owner` or `member`
 - `expenses` — one-off charges; `recurring_expense_id` set when materialized from a template
@@ -39,8 +41,8 @@ Schema lives in `schema/schema.sql`. Apply it directly against the Neon database
 
 One file per resource, method-based routing inside a single `export default handler`, following the reference project's pattern:
 
-- `api/db.js` — `getDb()` (lazy Neon client), `requireAuth(req)` (verifies JWT cookie, throws if missing/invalid), `requireGroupMember(sql, groupId, userId)` (throws if not a member), cookie helpers, CORS helper
-- `api/auth.js` — `/api/auth/register|login|logout|me`, routed via `?path=` query param through `vercel.json` rewrites (see reference project's auth.js for the same pattern)
+- `api/db.js` — `getDb()` (lazy Neon client), `requireAuth(req)` (verifies JWT cookie, throws if missing/invalid), `requireGroupMember(sql, groupId, userId)` (throws if not a member), cookie helpers (auth cookie + a short-lived OAuth `state` cookie for CSRF), CORS helper
+- `api/auth.js` — `/api/auth/register|login|logout|me`, routed via `?path=` query param through `vercel.json` rewrites (see reference project's auth.js for the same pattern). Also `/api/auth/github` (redirects to GitHub's authorize URL) and `/api/auth/github/callback` (exchanges the code, finds-or-creates/links a user by `github_id`/email, sets the auth cookie, redirects to `/`). The callback never returns JSON errors — any failure redirects to `/?authError=...` since it's a full-page browser flow, not a fetch call.
 - `api/groups.js` — group CRUD, membership (add by email lookup, remove), returns computed `balances` + `settleUp` suggestions on `GET ?id=`
 - `api/expenses.js` — expense CRUD; owns the split-calculation logic (`splitEqually`, exact-split validation); exports `splitEqually` for reuse by the cron job
 - `api/recurring.js` — recurring expense template CRUD

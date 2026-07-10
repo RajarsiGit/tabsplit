@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import {
   getDb,
@@ -6,7 +7,23 @@ import {
   setAuthCookie,
   clearAuthCookie,
   setCors,
+  parseCookies,
+  setOAuthStateCookie,
+  clearOAuthStateCookie,
+  OAUTH_STATE_COOKIE_NAME,
 } from "./db.js";
+
+const GITHUB_USER_AGENT = "TabSplit";
+
+function getGithubRedirectUri(req) {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  return `${proto}://${req.headers.host}/api/auth/github/callback`;
+}
+
+function redirectTo(res, location) {
+  res.setHeader("Location", location);
+  return res.status(302).end();
+}
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -80,6 +97,11 @@ export default async function handler(req, res) {
       }
 
       const user = result[0];
+      if (!user.password) {
+        return res
+          .status(401)
+          .json({ error: "This account signs in with GitHub. Use \"Continue with GitHub\" instead." });
+      }
       const isValidPassword = await bcrypt.compare(password, user.password);
 
       if (!isValidPassword) {
@@ -116,6 +138,108 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ user: result[0] });
+    }
+
+    if (req.method === "GET" && path === "github") {
+      if (!process.env.GITHUB_CLIENT_ID) {
+        return res.status(500).json({ error: "GitHub login is not configured" });
+      }
+
+      const state = crypto.randomBytes(16).toString("hex");
+      setOAuthStateCookie(res, state);
+
+      const params = new URLSearchParams({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        redirect_uri: getGithubRedirectUri(req),
+        scope: "read:user user:email",
+        state,
+      });
+
+      return redirectTo(res, `https://github.com/login/oauth/authorize?${params.toString()}`);
+    }
+
+    if (req.method === "GET" && path === "github/callback") {
+      // Any failure past this point sends the user back to the login screen with an
+      // error flag instead of a raw JSON 500 - this is a browser redirect flow, not a fetch().
+      try {
+        const { code, state, error: githubError } = req.query;
+        const savedState = parseCookies(req)[OAUTH_STATE_COOKIE_NAME];
+        clearOAuthStateCookie(res);
+
+        if (githubError || !code || !state || state !== savedState) {
+          return redirectTo(res, "/?authError=github");
+        }
+
+        const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            client_id: process.env.GITHUB_CLIENT_ID,
+            client_secret: process.env.GITHUB_CLIENT_SECRET,
+            code,
+            redirect_uri: getGithubRedirectUri(req),
+          }),
+        });
+        const tokenData = await tokenRes.json();
+        if (!tokenData.access_token) {
+          return redirectTo(res, "/?authError=github");
+        }
+
+        const ghHeaders = {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          "User-Agent": GITHUB_USER_AGENT,
+          Accept: "application/vnd.github+json",
+        };
+
+        const profileRes = await fetch("https://api.github.com/user", { headers: ghHeaders });
+        const profile = await profileRes.json();
+        if (!profile?.id) {
+          return redirectTo(res, "/?authError=github");
+        }
+
+        let email = profile.email;
+        if (!email) {
+          const emailsRes = await fetch("https://api.github.com/user/emails", { headers: ghHeaders });
+          const emails = await emailsRes.json();
+          const primary = Array.isArray(emails)
+            ? emails.find((e) => e.primary && e.verified) || emails.find((e) => e.verified)
+            : null;
+          email = primary?.email;
+        }
+        if (!email) {
+          return redirectTo(res, "/?authError=github_no_email");
+        }
+
+        const githubId = String(profile.id);
+        const name = profile.name || profile.login;
+
+        let userResult = await sql`SELECT id, name, email FROM users WHERE github_id = ${githubId}`;
+
+        if (userResult.length === 0) {
+          const byEmail = await sql`SELECT id FROM users WHERE email = ${email}`;
+          if (byEmail.length > 0) {
+            userResult = await sql`
+              UPDATE users SET github_id = ${githubId} WHERE id = ${byEmail[0].id}
+              RETURNING id, name, email
+            `;
+          } else {
+            userResult = await sql`
+              INSERT INTO users (name, email, password, github_id)
+              VALUES (${name}, ${email}, NULL, ${githubId})
+              RETURNING id, name, email
+            `;
+          }
+        }
+
+        const user = userResult[0];
+        const token = signToken({ userId: user.id, email: user.email });
+        setAuthCookie(res, token);
+
+        return redirectTo(res, "/");
+      } catch (err) {
+        console.error("GitHub OAuth callback failed:", err);
+        return redirectTo(res, "/?authError=github");
+      }
     }
 
     return res.status(405).json({ error: "Method not allowed" });
