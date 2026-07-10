@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/auth/register",
+      "destination": "/api/auth?path=register"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/auth?path=login"
+    },
+    {
+      "source": "/api/auth/logout",
+      "destination": "/api/auth?path=logout"
+    },
+    {
+      "source": "/api/auth/me",
+      "destination": "/api/auth?path=me"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/process-recurring",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
