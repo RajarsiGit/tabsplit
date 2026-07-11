@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { groupsApi, expensesApi } from "../utils/api";
+import { groupsApi } from "../utils/api";
 import { CURRENCIES } from "../utils/currencies";
-import Dashboard from "./Dashboard.jsx";
 
-export default function GroupsList() {
+export default function Groups() {
   const [groups, setGroups] = useState([]);
   const [archivedGroups, setArchivedGroups] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
-  const [expensesByGroup, setExpensesByGroup] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -25,13 +23,7 @@ export default function GroupsList() {
     setLoading(true);
     groupsApi
       .list()
-      .then(async (data) => {
-        setGroups(data);
-        const entries = await Promise.all(
-          data.map((g) => expensesApi.listForGroup(g.id).then((exps) => [g.id, exps]).catch(() => [g.id, []]))
-        );
-        setExpensesByGroup(Object.fromEntries(entries));
-      })
+      .then(setGroups)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
@@ -100,14 +92,8 @@ export default function GroupsList() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold">Dashboard</h1>
-
-      {error && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
-
-      {!loading && <Dashboard groups={groups} expensesByGroup={expensesByGroup} />}
-
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Your groups</h2>
+        <h1 className="text-xl font-bold">Your groups</h1>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
@@ -116,6 +102,8 @@ export default function GroupsList() {
           {showForm ? "Cancel" : "New group"}
         </button>
       </div>
+
+      {error && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {showForm && (
         <form

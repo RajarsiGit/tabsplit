@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Users,
+  Receipt,
+  ArrowLeftRight,
+  Repeat,
+  Activity as ActivityIcon,
+  Settings as SettingsIcon,
+  Menu,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import { useApp } from "../context/AppContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { accountApi } from "../utils/api";
 import NotificationsBell from "./NotificationsBell.jsx";
-import GroupSwitcher from "./GroupSwitcher.jsx";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Light" },
@@ -13,12 +24,13 @@ const THEME_OPTIONS = [
 ];
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: "⌂", end: true },
-  { to: "/expenses", label: "All Expenses", icon: "≡" },
-  { to: "/settle-up", label: "Settle Up", icon: "⇄" },
-  { to: "/recurring", label: "Recurring", icon: "↻" },
-  { to: "/activity", label: "Activity", icon: "◔" },
-  { to: "/settings", label: "Settings", icon: "⚙" },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/groups", label: "Groups", icon: Users },
+  { to: "/expenses", label: "All Expenses", icon: Receipt },
+  { to: "/settle-up", label: "Settle Up", icon: ArrowLeftRight },
+  { to: "/recurring", label: "Recurring", icon: Repeat },
+  { to: "/activity", label: "Activity", icon: ActivityIcon },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 function navLinkClass({ isActive }) {
@@ -120,7 +132,7 @@ function UserMenu() {
           <span className="block truncate text-sm font-medium text-gray-800 dark:text-gray-200">{user.name}</span>
           <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{user.email}</span>
         </span>
-        <span className="shrink-0 text-gray-400 dark:text-gray-500">&#9662;</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
       </button>
     </div>
   );
@@ -147,27 +159,21 @@ function SidebarContent({ onNavigate, showBrandHeader = true }) {
             type="button"
             onClick={onNavigate}
             aria-label="Close menu"
-            className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+            className="rounded-md border border-gray-300 dark:border-gray-600 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-900"
           >
-            &#10005;
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )}
 
-      <nav className="space-y-1 px-3">
+      <nav className="flex-1 space-y-1 px-3">
         {NAV_ITEMS.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end} onClick={onNavigate} className={navLinkClass}>
-            <span aria-hidden="true" className="text-base">
-              {item.icon}
-            </span>
+            <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
             {item.label}
           </NavLink>
         ))}
       </nav>
-
-      <div className="mt-4 flex-1 overflow-y-auto px-3">
-        <GroupSwitcher onNavigate={onNavigate} />
-      </div>
 
       <div className="px-3 pb-4 pt-2">
         <UserMenu />
@@ -186,9 +192,9 @@ export default function Sidebar() {
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
-          className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+          className="rounded-md border border-gray-300 dark:border-gray-600 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-900"
         >
-          &#9776;
+          <Menu className="h-4 w-4" aria-hidden="true" />
         </button>
         <NavLink to="/" className="flex items-center gap-2 text-base font-bold text-brand-600 dark:text-brand-400">
           <img src="/favicon.svg" alt="" className="h-6 w-6" />

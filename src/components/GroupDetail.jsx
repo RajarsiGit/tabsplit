@@ -187,7 +187,7 @@ export default function GroupDetail() {
     setError("");
     try {
       await groupsApi.delete(id);
-      navigate("/");
+      navigate("/groups");
     } catch (err) {
       setError(err.message);
       setConfirmingDeleteGroup(false);
@@ -248,7 +248,7 @@ export default function GroupDetail() {
       await groupsApi.removeMember(id, memberId);
       setConfirmingRemoveId(null);
       if (memberId === user.id) {
-        navigate("/");
+        navigate("/groups");
       } else {
         loadGroup();
       }
@@ -281,7 +281,7 @@ export default function GroupDetail() {
 
   return (
     <div>
-      <Link to="/" className="mb-4 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline">
+      <Link to="/groups" className="mb-4 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline">
         &larr; Back to groups
       </Link>
 

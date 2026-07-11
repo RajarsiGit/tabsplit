@@ -2,7 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useApp } from "./context/AppContext.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import Sidebar from "./components/Sidebar.jsx";
-import GroupsList from "./components/GroupsList.jsx";
+import DashboardPage from "./components/DashboardPage.jsx";
+import Groups from "./components/Groups.jsx";
 import GroupDetail from "./components/GroupDetail.jsx";
 import AllExpenses from "./components/AllExpenses.jsx";
 import SettleUp from "./components/SettleUp.jsx";
@@ -25,7 +26,8 @@ function AuthedShell({ children }) {
 function MainRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<GroupsList />} />
+      <Route path="/" element={<DashboardPage />} />
+      <Route path="/groups" element={<Groups />} />
       <Route path="/groups/:id" element={<GroupDetail />} />
       <Route path="/expenses" element={<AllExpenses />} />
       <Route path="/settle-up" element={<SettleUp />} />

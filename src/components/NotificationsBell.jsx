@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Bell } from "lucide-react";
 import PropTypes from "prop-types";
 import { notificationsApi } from "../utils/api";
 
@@ -51,9 +52,9 @@ export default function NotificationsBell({ align = "right" }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Notifications"
-        className="relative shrink-0 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+        className="relative shrink-0 rounded-md border border-gray-300 dark:border-gray-600 p-1.5 hover:bg-gray-50 dark:hover:bg-gray-900"
       >
-        &#128276;
+        <Bell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
