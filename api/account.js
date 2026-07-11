@@ -78,6 +78,60 @@ export default async function handler(req, res) {
   const userId = auth.userId;
 
   try {
+    if (req.method === "GET") {
+      const [profile] = await sql`
+        SELECT id, name, email, created_at FROM users WHERE id = ${userId}
+      `;
+
+      const groups = await sql`
+        SELECT g.id, g.name, g.description, g.currency, gm.role, gm.joined_at
+        FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE gm.user_id = ${userId}
+        ORDER BY g.id
+      `;
+
+      const expenses = await sql`
+        SELECT e.*
+        FROM expenses e
+        JOIN group_members gm ON gm.group_id = e.group_id AND gm.user_id = ${userId}
+        ORDER BY e.group_id, e.expense_date
+      `;
+
+      const expenseSplits = await sql`
+        SELECT es.*
+        FROM expense_splits es
+        JOIN expenses e ON e.id = es.expense_id
+        JOIN group_members gm ON gm.group_id = e.group_id AND gm.user_id = ${userId}
+        ORDER BY es.expense_id
+      `;
+
+      const recurringExpenses = await sql`
+        SELECT r.*
+        FROM recurring_expenses r
+        JOIN group_members gm ON gm.group_id = r.group_id AND gm.user_id = ${userId}
+        ORDER BY r.group_id, r.next_occurrence
+      `;
+
+      const settlements = await sql`
+        SELECT s.*
+        FROM settlements s
+        JOIN group_members gm ON gm.group_id = s.group_id AND gm.user_id = ${userId}
+        ORDER BY s.group_id, s.settled_at
+      `;
+
+      res.setHeader("Content-Disposition", 'attachment; filename="tabsplit-export.json"');
+      return res.status(200).json({
+        exportedAt: new Date().toISOString(),
+        profile,
+        groups,
+        expenses,
+        expenseSplits,
+        recurringExpenses,
+        settlements,
+      });
+    }
+
     if (req.method === "DELETE") {
       const { mode } = req.body || {};
 

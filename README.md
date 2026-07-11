@@ -37,10 +37,15 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - JWT stored in an HTTP-only cookie (7-day session)
 
 - **Account settings**
-  - A dedicated **Settings** page (linked from the navbar) with a danger zone for deleting your account
-  - Choose **delete only my own records** — you leave every group (ownership hands off automatically if you're the sole owner), and your profile is scrubbed to a "Deleted user" placeholder so shared expenses/settlements you were part of stay intact for other members
-  - Or choose **delete everything associated with me** — a full wipe: groups you solely own are deleted entirely, and anything you paid for or created elsewhere is removed too
-  - Requires typing `DELETE` to confirm before the button is enabled
+  - A dedicated **Settings** page (linked from the navbar)
+  - Edit your display name
+  - Change your password, or **set one for the first time** if you originally signed up via GitHub only
+  - Connect or disconnect GitHub from an existing account (disconnecting is blocked if you have no password set, to avoid locking yourself out)
+  - **Export your data** — download a JSON snapshot of your groups, expenses, splits, recurring templates, and settlements
+  - A danger zone for deleting your account:
+    - Choose **delete only my own records** — you leave every group (ownership hands off automatically if you're the sole owner), and your profile is scrubbed to a "Deleted user" placeholder so shared expenses/settlements you were part of stay intact for other members
+    - Or choose **delete everything associated with me** — a full wipe: groups you solely own are deleted entirely, and anything you paid for or created elsewhere is removed too
+    - Requires typing `DELETE` to confirm before the button is enabled
 
 ## Getting Started
 
@@ -136,9 +141,17 @@ Open a group → **Balances** tab to see who owes whom, plus a simplified list o
 
 Open a group → **Settings** tab. Owners can edit the group's name, description, and currency, promote/demote members from the **Members** tab, and delete the group entirely from the danger zone (two-step confirmation).
 
+### Managing your profile, password, and connected accounts
+
+Click **Settings** in the navbar. Update your name, change (or set) your password, and connect/disconnect GitHub sign-in. Disconnecting GitHub is blocked until you've set a password, so you can't lock yourself out.
+
+### Exporting your data
+
+Settings → **Export my data** downloads a JSON file with everything tied to your account: groups, expenses, splits, recurring templates, and settlements.
+
 ### Deleting your account
 
-Click **Settings** in the navbar → danger zone. Pick **delete only my own records** (recommended — preserves shared history for other members) or **delete everything associated with me** (full wipe), type `DELETE` to confirm, and submit.
+Settings → danger zone. Pick **delete only my own records** (recommended — preserves shared history for other members) or **delete everything associated with me** (full wipe), type `DELETE` to confirm, and submit.
 
 ## Technology Stack
 

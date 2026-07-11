@@ -24,6 +24,10 @@ export const authApi = {
     request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
+  updateProfile: (name) => request("/auth/profile", { method: "PUT", body: JSON.stringify({ name }) }),
+  updatePassword: (currentPassword, newPassword) =>
+    request("/auth/password", { method: "PUT", body: JSON.stringify({ currentPassword, newPassword }) }),
+  unlinkGithub: () => request("/auth/github/unlink", { method: "POST" }),
   githubLoginUrl: `${BASE_URL}/auth/github`,
 };
 
@@ -46,6 +50,7 @@ export const groupsApi = {
 
 export const accountApi = {
   delete: (mode) => request("/account", { method: "DELETE", body: JSON.stringify({ mode }) }),
+  exportUrl: `${BASE_URL}/account`,
 };
 
 export const expensesApi = {

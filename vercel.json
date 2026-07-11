@@ -21,8 +21,20 @@
       "destination": "/api/auth?path=me"
     },
     {
+      "source": "/api/auth/profile",
+      "destination": "/api/auth?path=profile"
+    },
+    {
+      "source": "/api/auth/password",
+      "destination": "/api/auth?path=password"
+    },
+    {
       "source": "/api/auth/github/callback",
       "destination": "/api/auth?path=github/callback"
+    },
+    {
+      "source": "/api/auth/github/unlink",
+      "destination": "/api/auth?path=github/unlink"
     },
     {
       "source": "/api/auth/github",

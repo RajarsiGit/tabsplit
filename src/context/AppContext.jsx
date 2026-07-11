@@ -33,8 +33,14 @@ export function AppProvider({ children }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const data = await authApi.me();
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   return (
-    <AppContext.Provider value={{ user, loading, login, register, logout }}>
+    <AppContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AppContext.Provider>
   );

@@ -78,7 +78,7 @@ export default async function handler(req, res) {
       const token = signToken({ userId: user.id, email: user.email });
       setAuthCookie(res, token);
 
-      return res.status(201).json({ user });
+      return res.status(201).json({ user: { ...user, has_password: true, has_github: false } });
     }
 
     if (req.method === "POST" && path === "login") {
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
       }
 
       const result = await sql`
-        SELECT id, name, email, password FROM users WHERE email = ${email}
+        SELECT id, name, email, password, github_id FROM users WHERE email = ${email}
       `;
 
       if (result.length === 0) {
@@ -112,7 +112,13 @@ export default async function handler(req, res) {
       setAuthCookie(res, token);
 
       return res.status(200).json({
-        user: { id: user.id, name: user.name, email: user.email },
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          has_password: true,
+          has_github: !!user.github_id,
+        },
       });
     }
 
@@ -130,7 +136,10 @@ export default async function handler(req, res) {
       }
 
       const result = await sql`
-        SELECT id, name, email, created_at FROM users WHERE id = ${decoded.userId}
+        SELECT id, name, email, created_at,
+          (password IS NOT NULL) AS has_password,
+          (github_id IS NOT NULL) AS has_github
+        FROM users WHERE id = ${decoded.userId}
       `;
 
       if (result.length === 0) {
@@ -138,6 +147,82 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ user: result[0] });
+    }
+
+    if (req.method === "PUT" && path === "profile") {
+      let decoded;
+      try {
+        decoded = requireAuth(req);
+      } catch {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { name } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+
+      const result = await sql`
+        UPDATE users SET name = ${name.trim()} WHERE id = ${decoded.userId}
+        RETURNING id, name, email, created_at,
+          (password IS NOT NULL) AS has_password,
+          (github_id IS NOT NULL) AS has_github
+      `;
+
+      return res.status(200).json({ user: result[0] });
+    }
+
+    if (req.method === "PUT" && path === "password") {
+      let decoded;
+      try {
+        decoded = requireAuth(req);
+      } catch {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { currentPassword, newPassword } = req.body;
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: "New password must be at least 6 characters" });
+      }
+
+      const rows = await sql`SELECT password FROM users WHERE id = ${decoded.userId}`;
+      const existingHash = rows[0]?.password;
+
+      if (existingHash) {
+        if (!currentPassword) {
+          return res.status(400).json({ error: "Current password is required" });
+        }
+        const isValid = await bcrypt.compare(currentPassword, existingHash);
+        if (!isValid) {
+          return res.status(401).json({ error: "Current password is incorrect" });
+        }
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await sql`UPDATE users SET password = ${hashedPassword} WHERE id = ${decoded.userId}`;
+
+      return res.status(200).json({ message: existingHash ? "Password updated" : "Password set" });
+    }
+
+    if (req.method === "POST" && path === "github/unlink") {
+      let decoded;
+      try {
+        decoded = requireAuth(req);
+      } catch {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const rows = await sql`SELECT password, github_id FROM users WHERE id = ${decoded.userId}`;
+      if (!rows[0]?.github_id) {
+        return res.status(400).json({ error: "No GitHub account is connected" });
+      }
+      if (!rows[0].password) {
+        return res.status(400).json({ error: "Set a password before disconnecting GitHub" });
+      }
+
+      await sql`UPDATE users SET github_id = NULL WHERE id = ${decoded.userId}`;
+
+      return res.status(200).json({ message: "GitHub disconnected" });
     }
 
     if (req.method === "GET" && path === "github") {
@@ -159,15 +244,27 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET" && path === "github/callback") {
-      // Any failure past this point sends the user back to the login screen with an
-      // error flag instead of a raw JSON 500 - this is a browser redirect flow, not a fetch().
+      // If the browser still carries a valid session cookie through the GitHub redirect
+      // round-trip, this is a "connect GitHub to my existing account" flow from the Settings
+      // page rather than a login/register flow - link instead of finding-or-creating a user.
+      let existingAuth = null;
+      try {
+        existingAuth = requireAuth(req);
+      } catch {
+        existingAuth = null;
+      }
+      const failureRedirect = existingAuth ? "/settings?authError=github" : "/?authError=github";
+
+      // Any failure past this point sends the user back to the login screen (or Settings, if
+      // linking) with an error flag instead of a raw JSON 500 - this is a browser redirect
+      // flow, not a fetch().
       try {
         const { code, state, error: githubError } = req.query;
         const savedState = parseCookies(req)[OAUTH_STATE_COOKIE_NAME];
         clearOAuthStateCookie(res);
 
         if (githubError || !code || !state || state !== savedState) {
-          return redirectTo(res, "/?authError=github");
+          return redirectTo(res, failureRedirect);
         }
 
         const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
@@ -182,7 +279,7 @@ export default async function handler(req, res) {
         });
         const tokenData = await tokenRes.json();
         if (!tokenData.access_token) {
-          return redirectTo(res, "/?authError=github");
+          return redirectTo(res, failureRedirect);
         }
 
         const ghHeaders = {
@@ -194,7 +291,7 @@ export default async function handler(req, res) {
         const profileRes = await fetch("https://api.github.com/user", { headers: ghHeaders });
         const profile = await profileRes.json();
         if (!profile?.id) {
-          return redirectTo(res, "/?authError=github");
+          return redirectTo(res, failureRedirect);
         }
 
         let email = profile.email;
@@ -207,11 +304,26 @@ export default async function handler(req, res) {
           email = primary?.email;
         }
         if (!email) {
-          return redirectTo(res, "/?authError=github_no_email");
+          return redirectTo(
+            res,
+            existingAuth ? "/settings?authError=github_no_email" : "/?authError=github_no_email"
+          );
         }
 
         const githubId = String(profile.id);
         const name = profile.name || profile.login;
+
+        if (existingAuth) {
+          const conflict = await sql`
+            SELECT id FROM users WHERE github_id = ${githubId} AND id != ${existingAuth.userId}
+          `;
+          if (conflict.length > 0) {
+            return redirectTo(res, "/settings?authError=github_taken");
+          }
+
+          await sql`UPDATE users SET github_id = ${githubId} WHERE id = ${existingAuth.userId}`;
+          return redirectTo(res, "/settings?linked=github");
+        }
 
         let userResult = await sql`SELECT id, name, email FROM users WHERE github_id = ${githubId}`;
 
@@ -238,7 +350,7 @@ export default async function handler(req, res) {
         return redirectTo(res, "/");
       } catch (err) {
         console.error("GitHub OAuth callback failed:", err);
-        return redirectTo(res, "/?authError=github");
+        return redirectTo(res, failureRedirect);
       }
     }
 
