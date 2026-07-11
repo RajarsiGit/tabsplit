@@ -1,5 +1,6 @@
 import { getDb, requireAuth, setCors, requireGroupMember, requireGroupOwner, isSoleOwner } from "./db.js";
 import { computeBalances, simplifyDebts } from "./balances.js";
+import { createNotification } from "./notifications.js";
 
 function isValidCurrency(code) {
   return typeof code === "string" && /^[A-Z]{3}$/.test(code);
@@ -96,6 +97,14 @@ export default async function handler(req, res) {
         VALUES (${id}, ${newMember.id}, 'member')
       `;
 
+      const groupForNotify = await sql`SELECT name FROM groups WHERE id = ${id}`;
+      await createNotification(sql, {
+        userId: newMember.id,
+        groupId: id,
+        type: "group_added",
+        message: `You were added to "${groupForNotify[0].name}"`,
+      });
+
       return res.status(201).json(newMember);
     }
 
@@ -183,6 +192,14 @@ export default async function handler(req, res) {
       if (result.length === 0) {
         return res.status(404).json({ error: "Member not found" });
       }
+
+      const groupForNotify = await sql`SELECT name FROM groups WHERE id = ${id}`;
+      await createNotification(sql, {
+        userId: targetUserId,
+        groupId: id,
+        type: "role_changed",
+        message: `Your role in "${groupForNotify[0].name}" changed to ${role}`,
+      });
 
       return res.status(200).json(result[0]);
     }

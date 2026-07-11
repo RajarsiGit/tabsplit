@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PropTypes from "prop-types";
+import { upload } from "@vercel/blob/client";
 import { expensesApi } from "../utils/api";
 import { CATEGORIES } from "../utils/categories";
 
@@ -12,11 +13,24 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
   const [splitType, setSplitType] = useState("equal");
   const [selected, setSelected] = useState(() => new Set(members.map((m) => m.id)));
   const [exactAmounts, setExactAmounts] = useState({});
+  const [multiPayer, setMultiPayer] = useState(false);
+  const [payers, setPayers] = useState(() => new Set());
+  const [payerAmounts, setPayerAmounts] = useState({});
+  const [receiptFile, setReceiptFile] = useState(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function toggleMember(id) {
     setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePayer(id) {
+    setPayers((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -44,18 +58,40 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
       participants = participantIds.map((id) => ({ userId: id }));
     }
 
+    const payload = {
+      groupId,
+      description,
+      amount: Number(amount),
+      category,
+      splitType,
+      expenseDate,
+      participants,
+    };
+
+    if (multiPayer) {
+      const payerIds = [...payers];
+      if (payerIds.length === 0) {
+        setError("Select at least one payer");
+        return;
+      }
+      payload.payments = payerIds.map((id) => ({
+        userId: id,
+        amount: Number(payerAmounts[id] || 0),
+      }));
+    } else {
+      payload.paidBy = Number(paidBy);
+    }
+
     setSubmitting(true);
     try {
-      await expensesApi.create({
-        groupId,
-        description,
-        amount: Number(amount),
-        category,
-        splitType,
-        expenseDate,
-        paidBy: Number(paidBy),
-        participants,
-      });
+      if (receiptFile) {
+        const blob = await upload(receiptFile.name, receiptFile, {
+          access: "public",
+          handleUploadUrl: "/api/blob-upload",
+        });
+        payload.receiptUrl = blob.url;
+      }
+      await expensesApi.create(payload);
       onAdded();
     } catch (err) {
       setError(err.message);
@@ -129,22 +165,57 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
           </select>
         </div>
 
-        <div>
-          <label htmlFor="expense-paid-by" className="mb-1 block text-sm font-medium text-gray-700">
-            Paid by
-          </label>
-          <select
-            id="expense-paid-by"
-            value={paidBy}
-            onChange={(e) => setPaidBy(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-          >
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+        <div className="sm:col-span-2">
+          <div className="mb-1 flex items-center justify-between">
+            <label htmlFor="expense-paid-by" className="block text-sm font-medium text-gray-700">
+              Paid by
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600">
+              <input
+                type="checkbox"
+                checked={multiPayer}
+                onChange={(e) => setMultiPayer(e.target.checked)}
+              />
+              Split the payment too
+            </label>
+          </div>
+
+          {multiPayer ? (
+            <div className="space-y-2 rounded-md border border-gray-200 p-2">
+              {members.map((m) => (
+                <div key={m.id} className="flex items-center gap-3">
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                    <input type="checkbox" checked={payers.has(m.id)} onChange={() => togglePayer(m.id)} />
+                    <span className="truncate">{m.name}</span>
+                  </label>
+                  {payers.has(m.id) && (
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={payerAmounts[m.id] ?? ""}
+                      onChange={(e) => setPayerAmounts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                      className="w-20 shrink-0 rounded-md border border-gray-300 px-2 py-1 text-sm sm:w-24"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <select
+              id="expense-paid-by"
+              value={paidBy}
+              onChange={(e) => setPaidBy(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -199,6 +270,19 @@ export default function AddExpenseForm({ groupId, members, onAdded, onCancel }) 
           ))}
         </div>
       </fieldset>
+
+      <div>
+        <label htmlFor="expense-receipt" className="mb-1 block text-sm font-medium text-gray-700">
+          Receipt (optional)
+        </label>
+        <input
+          id="expense-receipt"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+          className="block w-full text-sm text-gray-600"
+        />
+      </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

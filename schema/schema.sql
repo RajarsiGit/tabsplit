@@ -12,10 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Safe to re-run against a database created before GitHub login was added
-ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(255) UNIQUE;
-
 -- Groups table (a household or trip that shares expenses)
 CREATE TABLE IF NOT EXISTS groups (
   id SERIAL PRIMARY KEY,
@@ -26,9 +22,6 @@ CREATE TABLE IF NOT EXISTS groups (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Safe to re-run against a database created before the default currency changed to INR
-ALTER TABLE groups ALTER COLUMN currency SET DEFAULT 'INR';
 
 -- Group membership
 CREATE TABLE IF NOT EXISTS group_members (
@@ -58,10 +51,11 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
 );
 
 -- Expenses (one-off or generated from a recurring template)
+-- paid_by is nullable: NULL for multi-payer expenses, whose payers instead live in expense_payments
 CREATE TABLE IF NOT EXISTS expenses (
   id SERIAL PRIMARY KEY,
   group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-  paid_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  paid_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
   created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   recurring_expense_id INTEGER REFERENCES recurring_expenses(id) ON DELETE SET NULL,
   description VARCHAR(255) NOT NULL,
@@ -69,6 +63,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   category VARCHAR(50) NOT NULL DEFAULT 'other',
   split_type VARCHAR(20) NOT NULL DEFAULT 'equal',
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  receipt_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -81,6 +76,45 @@ CREATE TABLE IF NOT EXISTS expense_splits (
   share_amount NUMERIC(12, 2) NOT NULL,
   UNIQUE (expense_id, user_id)
 );
+
+-- How each expense was actually paid - supports splitting the payment itself across
+-- more than one payer (e.g. two roommates split paying for one grocery run). Every
+-- expense has at least one row here, even single-payer ones - this table, not
+-- expenses.paid_by, is the source of truth for "who paid what".
+CREATE TABLE IF NOT EXISTS expense_payments (
+  id SERIAL PRIMARY KEY,
+  expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount NUMERIC(12, 2) NOT NULL,
+  UNIQUE (expense_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_payments_expense_id ON expense_payments(expense_id);
+CREATE INDEX IF NOT EXISTS idx_expense_payments_user_id ON expense_payments(user_id);
+
+-- Invite links - one active token per group; regenerating replaces it
+CREATE TABLE IF NOT EXISTS group_invites (
+  id SERIAL PRIMARY KEY,
+  group_id INTEGER NOT NULL UNIQUE REFERENCES groups(id) ON DELETE CASCADE,
+  token VARCHAR(64) NOT NULL UNIQUE,
+  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invites_token ON group_invites(token);
+
+-- In-app notifications
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+  type VARCHAR(50) NOT NULL,
+  message TEXT NOT NULL,
+  read_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id, created_at DESC);
 
 -- Manual settlements ("I paid you back $20")
 CREATE TABLE IF NOT EXISTS settlements (

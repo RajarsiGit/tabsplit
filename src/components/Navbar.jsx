@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useApp } from "../context/AppContext.jsx";
+import NotificationsBell from "./NotificationsBell.jsx";
 
 export default function Navbar() {
   const { user, logout } = useApp();
@@ -13,6 +14,7 @@ export default function Navbar() {
         </Link>
         <div className="flex min-w-0 items-center gap-2 text-sm text-gray-600 sm:gap-4">
           <span className="hidden truncate sm:inline">{user.name}</span>
+          <NotificationsBell />
           <Link to="/settings" className="shrink-0 rounded-md border border-gray-300 px-3 py-1.5 font-medium hover:bg-gray-50">
             Settings
           </Link>

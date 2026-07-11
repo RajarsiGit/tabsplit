@@ -3,7 +3,13 @@
 // Returns a map of user_id -> net balance (positive = owed money, negative = owes money) for a group.
 export async function computeBalances(sql, groupId) {
   const [paidRows, owedRows, sentRows, receivedRows] = await Promise.all([
-    sql`SELECT paid_by AS user_id, SUM(amount) AS total FROM expenses WHERE group_id = ${groupId} GROUP BY paid_by`,
+    sql`
+      SELECT ep.user_id, SUM(ep.amount) AS total
+      FROM expense_payments ep
+      JOIN expenses e ON e.id = ep.expense_id
+      WHERE e.group_id = ${groupId}
+      GROUP BY ep.user_id
+    `,
     sql`
       SELECT es.user_id, SUM(es.share_amount) AS total
       FROM expense_splits es

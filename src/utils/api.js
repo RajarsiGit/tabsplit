@@ -68,6 +68,20 @@ export const recurringApi = {
   delete: (id) => request(`/recurring?id=${id}`, { method: "DELETE" }),
 };
 
+export const invitesApi = {
+  get: (groupId) => request(`/invites?groupId=${groupId}`),
+  preview: (token) => request(`/invites?token=${token}`),
+  accept: (token) => request(`/invites?token=${token}&action=accept`, { method: "POST" }),
+  generate: (groupId) => request(`/invites?groupId=${groupId}`, { method: "POST" }),
+  revoke: (groupId) => request(`/invites?groupId=${groupId}`, { method: "DELETE" }),
+};
+
+export const notificationsApi = {
+  list: () => request("/notifications"),
+  markRead: (id) => request(`/notifications?action=read&id=${id}`, { method: "POST" }),
+  markAllRead: () => request("/notifications?action=read-all", { method: "POST" }),
+};
+
 export const settlementsApi = {
   listForGroup: (groupId) => request(`/settlements?groupId=${groupId}`),
   create: (data) => request("/settlements", { method: "POST", body: JSON.stringify(data) }),

@@ -1,4 +1,5 @@
 import { getDb, requireAuth, setCors, requireGroupMember } from "./db.js";
+import { createNotification } from "./notifications.js";
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -58,6 +59,17 @@ export default async function handler(req, res) {
         VALUES (${bodyGroupId}, ${fromUser}, ${toUser}, ${amount}, ${note || null}, ${settledAt || new Date().toISOString().slice(0, 10)})
         RETURNING *
       `;
+
+      const actorName = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      const counterpartyIds = [fromUser, toUser].filter((u) => Number(u) !== Number(userId));
+      for (const counterpartyId of counterpartyIds) {
+        await createNotification(sql, {
+          userId: counterpartyId,
+          groupId: bodyGroupId,
+          type: "settlement_recorded",
+          message: `${actorName[0].name} recorded a settlement of ${amount}`,
+        });
+      }
 
       return res.status(201).json(result[0]);
     }

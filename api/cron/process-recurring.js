@@ -36,6 +36,12 @@ export default async function handler(req, res) {
       `;
 
       const expenseId = expenseResult[0].id;
+
+      await sql`
+        INSERT INTO expense_payments (expense_id, user_id, amount)
+        VALUES (${expenseId}, ${template.paid_by}, ${template.amount})
+      `;
+
       const splits = splitEqually(
         Number(template.amount),
         members.map((m) => m.user_id)

@@ -5,6 +5,27 @@ import Navbar from "./components/Navbar.jsx";
 import GroupsList from "./components/GroupsList.jsx";
 import GroupDetail from "./components/GroupDetail.jsx";
 import AccountSettings from "./components/AccountSettings.jsx";
+import InviteAccept from "./components/InviteAccept.jsx";
+
+function AuthedShell({ children }) {
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:py-8">{children}</main>
+    </div>
+  );
+}
+
+function MainRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<GroupsList />} />
+      <Route path="/groups/:id" element={<GroupDetail />} />
+      <Route path="/settings" element={<AccountSettings />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
   const { user, loading } = useApp();
@@ -17,21 +38,32 @@ export default function App() {
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
-  }
-
   return (
-    <div className="min-h-screen">
-      <Navbar />
-      <main className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
-        <Routes>
-          <Route path="/" element={<GroupsList />} />
-          <Route path="/groups/:id" element={<GroupDetail />} />
-          <Route path="/settings" element={<AccountSettings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </div>
+    <Routes>
+      <Route
+        path="/invite/:token"
+        element={
+          user ? (
+            <AuthedShell>
+              <InviteAccept />
+            </AuthedShell>
+          ) : (
+            <AuthScreen />
+          )
+        }
+      />
+      <Route
+        path="/*"
+        element={
+          user ? (
+            <AuthedShell>
+              <MainRoutes />
+            </AuthedShell>
+          ) : (
+            <AuthScreen />
+          )
+        }
+      />
+    </Routes>
   );
 }

@@ -20,6 +20,21 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Log one-off expenses with description, amount, category, and date
   - Split **equally** among selected participants, or enter **exact** custom amounts per person
   - Rounding remainders are distributed automatically so splits always add up to the penny
+  - **Split the payment itself** across more than one payer (e.g. two roommates who split fronting the cost of one grocery run) instead of a single "paid by"
+  - Attach a **receipt photo** to an expense (uploaded directly to Vercel Blob storage)
+
+- **Invite links**
+  - Group owners can generate a shareable invite link from the group's Settings tab
+  - Anyone who opens it (registering or logging in first, if needed) joins the group automatically
+  - Regenerate to invalidate the old link, or revoke it entirely
+
+- **Notifications**
+  - In-app notification bell in the navbar — no email required
+  - Notified when you're added to a group, your role changes, a new expense is logged, or someone records a settlement with you
+  - Unread badge count, mark one or all as read
+
+- **Insights**
+  - A group's **Insights** tab shows spend-by-category and paid-by-member bar charts, computed from that group's expenses
 
 - **Recurring expenses**
   - Set up templates for rent, utilities, subscriptions, etc. with a weekly or monthly frequency
@@ -77,6 +92,10 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
    GITHUB_CLIENT_ID=your_github_oauth_client_id
    GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
    ```
+   To enable receipt uploads, provision a [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) store and fill in:
+   ```
+   BLOB_READ_WRITE_TOKEN=your_blob_read_write_token
+   ```
 
 3. **Initialize the database:**
    - Create a project at [console.neon.tech](https://console.neon.tech)
@@ -129,6 +148,12 @@ Open a group → **Expenses** tab → **Add expense**. Choose who paid, the amou
 - **Equally** — pick which members are in on the expense; the amount is divided evenly
 - **Exact amounts** — enter each participant's share directly (must add up to the total)
 
+Check **Split the payment too** if more than one person fronted the money — pick each payer and how much they paid (must add up to the total). Optionally attach a receipt photo.
+
+### Inviting people via link
+
+Open a group → **Settings** tab → **Invite link** (owner-only). Click **Generate invite link** and share the URL. Anyone who opens it joins the group automatically once logged in (registering or logging in first if they aren't already). **Regenerate** invalidates the old link; **Revoke** removes it entirely.
+
 ### Setting up a recurring expense
 
 Open a group → **Recurring** tab → **Add recurring expense**. Choose an amount, category, frequency (weekly/monthly), and start date. Each time it's due, TabSplit generates a real expense split equally across the group's current members and schedules the next occurrence.
@@ -164,6 +189,7 @@ Settings → danger zone. Pick **delete only my own records** (recommended — p
 ### Backend
 - **Vercel Serverless Functions** — API endpoints (`api/*.js`)
 - **Vercel Cron** — daily job to materialize recurring expenses
+- **Vercel Blob** — receipt image storage
 - **Neon Postgres** — database
 - **@neondatabase/serverless** — database driver
 - **JWT + bcryptjs** — authentication
@@ -175,14 +201,17 @@ Settings → danger zone. Pick **delete only my own records** (recommended — p
 src/
 ├── components/
 │   ├── AuthScreen.jsx           # Login/register
-│   ├── Navbar.jsx                # Top nav with Settings link + logout
+│   ├── Navbar.jsx                # Top nav with notifications bell, Settings link, logout
+│   ├── NotificationsBell.jsx     # Notification badge + dropdown, polls every 30s
 │   ├── GroupsList.jsx            # Dashboard - list, create, and delete groups
-│   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Members/Settings)
-│   ├── AddExpenseForm.jsx        # Equal/exact split expense form
+│   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Insights/Members/Settings)
+│   ├── AddExpenseForm.jsx        # Equal/exact split, multi-payer, and receipt upload
 │   ├── AddRecurringForm.jsx      # Recurring expense template form
 │   ├── AddMemberForm.jsx         # Add member by email
 │   ├── BalancesSummary.jsx       # Balances + settle-up suggestions + settlement history
 │   ├── SettleUpForm.jsx          # Record a manual settlement
+│   ├── InsightsTab.jsx           # Spend-by-category / paid-by-member bar charts
+│   ├── InviteAccept.jsx          # /invite/:token destination - joins the group, then redirects
 │   └── AccountSettings.jsx       # Account danger zone (delete account, own/associated modes)
 ├── context/
 │   └── AppContext.jsx            # Auth state (user, login, register, logout)
@@ -190,19 +219,22 @@ src/
 │   ├── api.js                    # Fetch client per resource
 │   ├── categories.js             # Expense categories & currency formatting
 │   └── currencies.js             # Curated ISO currency list for pickers
-├── App.jsx                       # Routes + auth gate
+├── App.jsx                       # Route-aware auth gating (see CLAUDE.md)
 ├── main.jsx                      # Entry point
 └── index.css                     # Tailwind entry point
 api/
 ├── db.js                         # Neon client, auth/cookie helpers, requireGroupMember/Owner, isSoleOwner
 ├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
 ├── groups.js                     # Group CRUD + membership + roles + balances/settleUp
-├── expenses.js                   # Expense CRUD + split calculation
+├── expenses.js                   # Expense CRUD + split + multi-payer calculation + receipts
 ├── recurring.js                  # Recurring expense template CRUD
 ├── settlements.js                # Record/undo manual settlements
 ├── balances.js                   # computeBalances + simplifyDebts
 ├── recurrence.js                 # next-occurrence date math
 ├── account.js                    # Account deletion (associated vs. own-records modes)
+├── invites.js                    # Group invite link generate/revoke/preview/accept
+├── notifications.js              # In-app notifications - list, mark read, createNotification()
+├── blob-upload.js                # Vercel Blob client-upload handler for receipts
 └── cron/
     └── process-recurring.js      # Daily job: materializes due recurring expenses
 schema/

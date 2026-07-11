@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { groupsApi, expensesApi, recurringApi } from "../utils/api";
+import { groupsApi, expensesApi, recurringApi, invitesApi } from "../utils/api";
 import { formatCurrency } from "../utils/categories";
 import { CURRENCIES } from "../utils/currencies";
 import { useApp } from "../context/AppContext.jsx";
@@ -8,8 +8,9 @@ import AddExpenseForm from "./AddExpenseForm.jsx";
 import AddRecurringForm from "./AddRecurringForm.jsx";
 import AddMemberForm from "./AddMemberForm.jsx";
 import BalancesSummary from "./BalancesSummary.jsx";
+import InsightsTab from "./InsightsTab.jsx";
 
-const TABS = ["Expenses", "Recurring", "Balances", "Members", "Settings"];
+const TABS = ["Expenses", "Recurring", "Balances", "Insights", "Members", "Settings"];
 
 export default function GroupDetail() {
   const { id } = useParams();
@@ -30,6 +31,9 @@ export default function GroupDetail() {
   const [confirmingDeleteGroup, setConfirmingDeleteGroup] = useState(false);
   const [memberBusyId, setMemberBusyId] = useState(null);
   const [confirmingRemoveId, setConfirmingRemoveId] = useState(null);
+  const [inviteToken, setInviteToken] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const loadGroup = useCallback(() => {
     groupsApi.get(id).then(setGroup).catch((err) => setError(err.message));
@@ -56,6 +60,13 @@ export default function GroupDetail() {
       setSettingsCurrency(group.currency);
     }
   }, [group]);
+
+  useEffect(() => {
+    if (!group) return;
+    const membership = group.members.find((m) => m.id === user.id);
+    if (membership?.role !== "owner") return;
+    invitesApi.get(id).then((data) => setInviteToken(data.token)).catch(() => {});
+  }, [group, id, user.id]);
 
   async function handleDeleteExpense(expenseId) {
     await expensesApi.delete(expenseId);
@@ -98,6 +109,39 @@ export default function GroupDetail() {
       setError(err.message);
       setConfirmingDeleteGroup(false);
     }
+  }
+
+  async function handleGenerateInvite() {
+    setError("");
+    setInviteBusy(true);
+    try {
+      const { token } = await invitesApi.generate(id);
+      setInviteToken(token);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function handleRevokeInvite() {
+    setError("");
+    setInviteBusy(true);
+    try {
+      await invitesApi.revoke(id);
+      setInviteToken(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  function handleCopyInvite() {
+    const url = `${window.location.origin}/invite/${inviteToken}`;
+    navigator.clipboard.writeText(url);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
   }
 
   async function handleRemoveMember(memberId) {
@@ -207,7 +251,21 @@ export default function GroupDetail() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{exp.description}</p>
                     <p className="text-xs text-gray-500">
-                      {exp.expense_date} &middot; {exp.category} &middot; paid by {exp.paid_by_name}
+                      {exp.expense_date} &middot; {exp.category} &middot; paid by {exp.paid_by_names || "no one"}
+                      {exp.receipt_url && (
+                        <>
+                          {" "}
+                          &middot;{" "}
+                          <a
+                            href={exp.receipt_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-brand-600 hover:underline"
+                          >
+                            &#128206; Receipt
+                          </a>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:justify-end">
@@ -295,6 +353,10 @@ export default function GroupDetail() {
           currency={group.currency}
           onChanged={loadGroup}
         />
+      )}
+
+      {tab === "Insights" && (
+        <InsightsTab expenses={expenses} members={group.members} currency={group.currency} />
       )}
 
       {tab === "Members" && (
@@ -418,6 +480,60 @@ export default function GroupDetail() {
               <p className="text-xs text-gray-500">Only the group owner can edit these settings.</p>
             )}
           </form>
+
+          {isOwner && (
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <h2 className="mb-1 font-semibold">Invite link</h2>
+              <p className="mb-3 text-sm text-gray-500">
+                Anyone with this link can join the group. Regenerating replaces the old link.
+              </p>
+              {inviteToken ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      readOnly
+                      value={`${window.location.origin}/invite/${inviteToken}`}
+                      className="min-w-0 flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyInvite}
+                      className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
+                    >
+                      {inviteCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      disabled={inviteBusy}
+                      onClick={handleGenerateInvite}
+                      className="text-sm font-medium text-brand-600 hover:underline disabled:opacity-50"
+                    >
+                      Regenerate
+                    </button>
+                    <button
+                      type="button"
+                      disabled={inviteBusy}
+                      onClick={handleRevokeInvite}
+                      className="text-sm font-medium text-red-500 hover:underline disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={inviteBusy}
+                  onClick={handleGenerateInvite}
+                  className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  Generate invite link
+                </button>
+              )}
+            </div>
+          )}
 
           {isOwner && (
             <div className="rounded-lg border border-red-200 bg-white p-4">
