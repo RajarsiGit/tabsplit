@@ -95,7 +95,7 @@ export function clearAuthCookie(res) {
 
 export function setCors(req, res) {
   res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 }
@@ -109,4 +109,21 @@ export async function requireGroupMember(sql, groupId, userId) {
     throw new Error("Not a member of this group");
   }
   return rows[0];
+}
+
+// Throws if the user is not the group's owner.
+export async function requireGroupOwner(sql, groupId, userId) {
+  const membership = await requireGroupMember(sql, groupId, userId);
+  if (membership.role !== "owner") {
+    throw new Error("Only the group owner can do this");
+  }
+  return membership;
+}
+
+// True if userId is an owner of the group and no other member holds the owner role.
+export async function isSoleOwner(sql, groupId, userId) {
+  const rows = await sql`
+    SELECT user_id FROM group_members WHERE group_id = ${groupId} AND role = 'owner'
+  `;
+  return rows.length === 1 && rows[0].user_id === Number(userId);
 }

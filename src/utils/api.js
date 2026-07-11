@@ -31,11 +31,21 @@ export const groupsApi = {
   list: () => request("/groups"),
   get: (id) => request(`/groups?id=${id}`),
   create: (data) => request("/groups", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) => request("/groups", { method: "PUT", body: JSON.stringify({ id, ...data }) }),
   delete: (id) => request(`/groups?id=${id}`, { method: "DELETE" }),
   addMember: (id, email) =>
     request(`/groups?id=${id}&action=members`, { method: "POST", body: JSON.stringify({ email }) }),
   removeMember: (id, userId) =>
     request(`/groups?id=${id}&action=members&userId=${userId}`, { method: "DELETE" }),
+  updateMemberRole: (id, userId, role) =>
+    request(`/groups?id=${id}&action=members&userId=${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+};
+
+export const accountApi = {
+  delete: (mode) => request("/account", { method: "DELETE", body: JSON.stringify({ mode }) }),
 };
 
 export const expensesApi = {

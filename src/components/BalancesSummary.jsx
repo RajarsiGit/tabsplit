@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { formatCurrency } from "../utils/categories";
+import { settlementsApi } from "../utils/api";
 import SettleUpForm from "./SettleUpForm.jsx";
 
 function memberName(members, id) {
@@ -10,6 +11,19 @@ function memberName(members, id) {
 export default function BalancesSummary({ groupId, members, balances, settleUp, currency, onChanged }) {
   const [prefill, setPrefill] = useState(undefined);
   const [showForm, setShowForm] = useState(false);
+  const [settlements, setSettlements] = useState([]);
+  const [error, setError] = useState("");
+
+  const loadSettlements = useCallback(() => {
+    settlementsApi
+      .listForGroup(groupId)
+      .then(setSettlements)
+      .catch((err) => setError(err.message));
+  }, [groupId]);
+
+  useEffect(() => {
+    loadSettlements();
+  }, [loadSettlements]);
 
   function openForm(fill) {
     setPrefill(fill);
@@ -18,7 +32,19 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
 
   function handleDone() {
     setShowForm(false);
+    loadSettlements();
     onChanged();
+  }
+
+  async function handleDeleteSettlement(settlementId) {
+    setError("");
+    try {
+      await settlementsApi.delete(settlementId);
+      loadSettlements();
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -88,6 +114,34 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
           onCancel={() => setShowForm(false)}
         />
       )}
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="mb-3 font-semibold">Settlement history</h2>
+        {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+        {settlements.length === 0 ? (
+          <p className="text-sm text-gray-400">No settlements recorded yet.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {settlements.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span>
+                  <strong>{s.from_user_name}</strong> paid <strong>{s.to_user_name}</strong>{" "}
+                  {formatCurrency(s.amount, currency)}
+                  {s.note && <span className="text-gray-400"> &middot; {s.note}</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSettlement(s.id)}
+                  aria-label={`Remove settlement from ${s.from_user_name} to ${s.to_user_name}`}
+                  className="shrink-0 text-red-500 hover:underline"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

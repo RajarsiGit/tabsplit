@@ -1,16 +1,20 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { groupsApi, expensesApi, recurringApi } from "../utils/api";
 import { formatCurrency } from "../utils/categories";
+import { CURRENCIES } from "../utils/currencies";
+import { useApp } from "../context/AppContext.jsx";
 import AddExpenseForm from "./AddExpenseForm.jsx";
 import AddRecurringForm from "./AddRecurringForm.jsx";
 import AddMemberForm from "./AddMemberForm.jsx";
 import BalancesSummary from "./BalancesSummary.jsx";
 
-const TABS = ["Expenses", "Recurring", "Balances", "Members"];
+const TABS = ["Expenses", "Recurring", "Balances", "Members", "Settings"];
 
 export default function GroupDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useApp();
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [recurring, setRecurring] = useState([]);
@@ -18,6 +22,14 @@ export default function GroupDetail() {
   const [error, setError] = useState("");
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
+
+  const [settingsName, setSettingsName] = useState("");
+  const [settingsDescription, setSettingsDescription] = useState("");
+  const [settingsCurrency, setSettingsCurrency] = useState("USD");
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [confirmingDeleteGroup, setConfirmingDeleteGroup] = useState(false);
+  const [memberBusyId, setMemberBusyId] = useState(null);
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState(null);
 
   const loadGroup = useCallback(() => {
     groupsApi.get(id).then(setGroup).catch((err) => setError(err.message));
@@ -37,6 +49,14 @@ export default function GroupDetail() {
     loadRecurring();
   }, [loadGroup, loadExpenses, loadRecurring]);
 
+  useEffect(() => {
+    if (group) {
+      setSettingsName(group.name);
+      setSettingsDescription(group.description || "");
+      setSettingsCurrency(group.currency);
+    }
+  }, [group]);
+
   async function handleDeleteExpense(expenseId) {
     await expensesApi.delete(expenseId);
     loadExpenses();
@@ -48,9 +68,79 @@ export default function GroupDetail() {
     loadRecurring();
   }
 
+  async function handleSaveSettings(e) {
+    e.preventDefault();
+    setError("");
+    try {
+      await groupsApi.update(id, {
+        name: settingsName,
+        description: settingsDescription,
+        currency: settingsCurrency,
+      });
+      setSettingsSaved(true);
+      loadGroup();
+      setTimeout(() => setSettingsSaved(false), 2000);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!confirmingDeleteGroup) {
+      setConfirmingDeleteGroup(true);
+      return;
+    }
+    setError("");
+    try {
+      await groupsApi.delete(id);
+      navigate("/");
+    } catch (err) {
+      setError(err.message);
+      setConfirmingDeleteGroup(false);
+    }
+  }
+
+  async function handleRemoveMember(memberId) {
+    if (confirmingRemoveId !== memberId) {
+      setConfirmingRemoveId(memberId);
+      return;
+    }
+    setError("");
+    setMemberBusyId(memberId);
+    try {
+      await groupsApi.removeMember(id, memberId);
+      setConfirmingRemoveId(null);
+      if (memberId === user.id) {
+        navigate("/");
+      } else {
+        loadGroup();
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMemberBusyId(null);
+    }
+  }
+
+  async function handleRoleToggle(member) {
+    setError("");
+    setMemberBusyId(member.id);
+    try {
+      await groupsApi.updateMemberRole(id, member.id, member.role === "owner" ? "member" : "owner");
+      loadGroup();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMemberBusyId(null);
+    }
+  }
+
   if (!group) {
     return <p className="text-sm text-gray-500">{error || "Loading..."}</p>;
   }
+
+  const currentMembership = group.members.find((m) => m.id === user.id);
+  const isOwner = currentMembership?.role === "owner";
 
   return (
     <div>
@@ -213,19 +303,138 @@ export default function GroupDetail() {
             <AddMemberForm groupId={id} onAdded={loadGroup} />
           </div>
           <ul className="space-y-2">
-            {group.members.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{m.name}</p>
-                  <p className="truncate text-xs text-gray-500">{m.email}</p>
-                </div>
-                <span className="shrink-0 text-xs uppercase text-gray-400">{m.role}</span>
-              </li>
-            ))}
+            {group.members.map((m) => {
+              const isSelf = m.id === user.id;
+              const canRemove = isSelf || isOwner;
+              const canToggleRole = isOwner && !isSelf;
+              const busy = memberBusyId === m.id;
+
+              return (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{m.name}</p>
+                    <p className="truncate text-xs text-gray-500">{m.email}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-xs uppercase text-gray-400">{m.role}</span>
+                    {canToggleRole && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRoleToggle(m)}
+                        className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                      >
+                        {m.role === "owner" ? "Make member" : "Make owner"}
+                      </button>
+                    )}
+                    {canRemove && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRemoveMember(m.id)}
+                        aria-label={isSelf ? "Leave group" : `Remove ${m.name}`}
+                        className="text-xs font-medium text-red-500 hover:underline disabled:opacity-50"
+                      >
+                        {confirmingRemoveId === m.id
+                          ? "Confirm?"
+                          : isSelf
+                            ? "Leave group"
+                            : "Remove"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
+        </div>
+      )}
+
+      {tab === "Settings" && (
+        <div className="space-y-4">
+          <form
+            onSubmit={handleSaveSettings}
+            className="space-y-3 rounded-lg border border-gray-200 bg-white p-4"
+          >
+            <h2 className="font-semibold">Group settings</h2>
+            <div>
+              <label htmlFor="settings-name" className="mb-1 block text-sm font-medium text-gray-700">
+                Group name
+              </label>
+              <input
+                id="settings-name"
+                required
+                disabled={!isOwner}
+                value={settingsName}
+                onChange={(e) => setSettingsName(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="settings-description" className="mb-1 block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              <input
+                id="settings-description"
+                disabled={!isOwner}
+                value={settingsDescription}
+                onChange={(e) => setSettingsDescription(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="settings-currency" className="mb-1 block text-sm font-medium text-gray-700">
+                Currency
+              </label>
+              <select
+                id="settings-currency"
+                disabled={!isOwner}
+                value={settingsCurrency}
+                onChange={(e) => setSettingsCurrency(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {isOwner && (
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+                >
+                  Save changes
+                </button>
+                {settingsSaved && <span className="text-sm text-green-600">Saved</span>}
+              </div>
+            )}
+            {!isOwner && (
+              <p className="text-xs text-gray-500">Only the group owner can edit these settings.</p>
+            )}
+          </form>
+
+          {isOwner && (
+            <div className="rounded-lg border border-red-200 bg-white p-4">
+              <h2 className="mb-1 font-semibold text-red-700">Danger zone</h2>
+              <p className="mb-3 text-sm text-gray-500">
+                Deleting this group permanently removes all its expenses, recurring templates,
+                settlements, and members for everyone.
+              </p>
+              <button
+                type="button"
+                onClick={handleDeleteGroup}
+                className="rounded-md border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+              >
+                {confirmingDeleteGroup ? "Confirm delete group?" : "Delete this group"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

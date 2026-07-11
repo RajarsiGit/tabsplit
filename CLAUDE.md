@@ -48,12 +48,13 @@ One file per resource, method-based routing inside a single `export default hand
 - `api/recurring.js` — recurring expense template CRUD
 - `api/settlements.js` — record/undo manual settlements
 - `api/balances.js` — `computeBalances(sql, groupId)` (net balance per user from expenses + splits + settlements) and `simplifyDebts(balances)` (greedy min-transaction settle-up suggestions)
+- `api/account.js` — `DELETE /api/account`, body `{ mode: "associated" | "own" }`, always operates on the caller's own account. `associated` hard-deletes the user row (groups they solely own are deleted outright first; everything else cascades per `schema/schema.sql`'s `ON DELETE CASCADE` rules). `own` hands off sole-owned groups to the longest-tenured other member (or deletes the group if they're the only member), removes the user from every `group_members` row, then scrubs the `users` row in place (name/email/password/github_id) instead of deleting it, so shared expenses/splits/settlements they were part of stay visible to other members.
 - `api/recurrence.js` — `nextOccurrence(dateStr, frequency)` date math (weekly/monthly, monthly clamps to end-of-month)
 - `api/cron/process-recurring.js` — Vercel Cron target (see `vercel.json` `crons`, runs daily at 06:00 UTC). Materializes any `recurring_expenses` due (`next_occurrence <= CURRENT_DATE`) into real `expenses` rows split across current group members, then advances `next_occurrence`. Protected by `CRON_SECRET` if set.
 
 **Auth**: JWT in an HttpOnly cookie (`auth_token`, 7-day expiry — longer than the reference project's 1h since this isn't a task manager people re-open constantly). `requireAuth` throws; every handler catches and returns 401.
 
-**Authorization**: nearly every group-scoped endpoint calls `requireGroupMember` before touching data — a user must be a member of a group to read or write anything in it.
+**Authorization**: nearly every group-scoped endpoint calls `requireGroupMember` before touching data — a user must be a member of a group to read or write anything in it. Owner-only actions (editing group name/description/currency, deleting a group, changing another member's role) go through `requireGroupOwner`. `isSoleOwner(sql, groupId, userId)` (in `api/db.js`) guards against demoting or removing a group's last remaining owner — promote another member first.
 
 ## Balance Calculation
 

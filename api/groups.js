@@ -1,5 +1,9 @@
-import { getDb, requireAuth, setCors, requireGroupMember } from "./db.js";
+import { getDb, requireAuth, setCors, requireGroupMember, requireGroupOwner, isSoleOwner } from "./db.js";
 import { computeBalances, simplifyDebts } from "./balances.js";
+
+function isValidCurrency(code) {
+  return typeof code === "string" && /^[A-Z]{3}$/.test(code);
+}
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -103,6 +107,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Group name is required" });
       }
 
+      if (currency !== undefined && !isValidCurrency(currency)) {
+        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. USD" });
+      }
+
       const result = await sql`
         INSERT INTO groups (name, description, currency, created_by)
         VALUES (${name}, ${description || null}, ${currency || "USD"}, ${userId})
@@ -117,6 +125,66 @@ export default async function handler(req, res) {
       `;
 
       return res.status(201).json(group);
+    }
+
+    // PUT /api/groups - update name/description/currency (owner only)
+    if (req.method === "PUT") {
+      const { id: bodyId, name, description, currency } = req.body;
+
+      if (!bodyId) {
+        return res.status(400).json({ error: "Group id is required" });
+      }
+
+      await requireGroupOwner(sql, bodyId, userId);
+
+      if (currency !== undefined && !isValidCurrency(currency)) {
+        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. USD" });
+      }
+
+      const result = await sql`
+        UPDATE groups
+        SET
+          name = COALESCE(${name}, name),
+          description = COALESCE(${description ?? null}, description),
+          currency = COALESCE(${currency}, currency)
+        WHERE id = ${bodyId}
+        RETURNING *
+      `;
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+
+      return res.status(200).json(result[0]);
+    }
+
+    // PATCH /api/groups?id=X&action=members&userId=Y - change a member's role (owner only)
+    if (req.method === "PATCH" && id && action === "members") {
+      await requireGroupOwner(sql, id, userId);
+
+      const targetUserId = Number(req.query.userId);
+      const { role } = req.body;
+
+      if (!targetUserId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      if (role !== "owner" && role !== "member") {
+        return res.status(400).json({ error: "role must be 'owner' or 'member'" });
+      }
+      if (role === "member" && (await isSoleOwner(sql, id, targetUserId))) {
+        return res.status(409).json({ error: "Promote another member to owner before demoting the last owner" });
+      }
+
+      const result = await sql`
+        UPDATE group_members SET role = ${role} WHERE group_id = ${id} AND user_id = ${targetUserId}
+        RETURNING user_id, role
+      `;
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+
+      return res.status(200).json(result[0]);
     }
 
     // DELETE /api/groups?id=X&action=members&userId=Y - remove a member
@@ -138,6 +206,11 @@ export default async function handler(req, res) {
         return res.status(409).json({ error: "This member has an outstanding balance and can't be removed yet" });
       }
 
+      const memberCount = await sql`SELECT COUNT(*)::int AS count FROM group_members WHERE group_id = ${id}`;
+      if (memberCount[0].count > 1 && (await isSoleOwner(sql, id, targetUserId))) {
+        return res.status(409).json({ error: "Promote another member to owner before removing the last owner" });
+      }
+
       const result = await sql`
         DELETE FROM group_members WHERE group_id = ${id} AND user_id = ${targetUserId}
         RETURNING id
@@ -152,10 +225,7 @@ export default async function handler(req, res) {
 
     // DELETE /api/groups?id=X - delete a group (owner only)
     if (req.method === "DELETE" && id) {
-      const membership = await requireGroupMember(sql, id, userId);
-      if (membership.role !== "owner") {
-        return res.status(403).json({ error: "Only the group owner can delete this group" });
-      }
+      await requireGroupOwner(sql, id, userId);
 
       const result = await sql`DELETE FROM groups WHERE id = ${id} RETURNING id`;
       if (result.length === 0) {
@@ -167,7 +237,7 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
-    if (error.message === "Not a member of this group") {
+    if (error.message === "Not a member of this group" || error.message === "Only the group owner can do this") {
       return res.status(403).json({ error: error.message });
     }
     return res.status(500).json({ error: error.message });

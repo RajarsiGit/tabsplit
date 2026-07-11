@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { groupsApi } from "../utils/api";
+import { CURRENCIES } from "../utils/currencies";
 
 export default function GroupsList() {
   const [groups, setGroups] = useState([]);
@@ -9,6 +10,8 @@ export default function GroupsList() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [confirmingId, setConfirmingId] = useState(null);
 
   useEffect(() => {
     loadGroups();
@@ -27,10 +30,30 @@ export default function GroupsList() {
     e.preventDefault();
     setError("");
     try {
-      await groupsApi.create({ name, description });
+      await groupsApi.create({ name, description, currency });
       setName("");
       setDescription("");
+      setCurrency("USD");
       setShowForm(false);
+      loadGroups();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDelete(e, groupId) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (confirmingId !== groupId) {
+      setConfirmingId(groupId);
+      return;
+    }
+
+    setError("");
+    try {
+      await groupsApi.delete(groupId);
+      setConfirmingId(null);
       loadGroups();
     } catch (err) {
       setError(err.message);
@@ -81,6 +104,23 @@ export default function GroupsList() {
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
+          <div>
+            <label htmlFor="group-currency" className="mb-1 block text-sm font-medium text-gray-700">
+              Currency
+            </label>
+            <select
+              id="group-currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="submit"
             className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
@@ -106,9 +146,22 @@ export default function GroupsList() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <span className="min-w-0 truncate font-semibold">{group.name}</span>
-                  <span className="shrink-0 text-xs text-gray-500">
-                    {group.member_count} member{group.member_count === "1" ? "" : "s"}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="text-xs text-gray-500">
+                      {group.member_count} member{group.member_count === "1" ? "" : "s"}
+                    </span>
+                    {group.role === "owner" && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(e, group.id)}
+                        onBlur={() => setConfirmingId(null)}
+                        aria-label={`Delete group ${group.name}`}
+                        className="text-xs font-medium text-red-500 hover:underline"
+                      >
+                        {confirmingId === group.id ? "Confirm delete?" : "Delete"}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {group.description && (
                   <p className="mt-1 text-sm text-gray-500">{group.description}</p>

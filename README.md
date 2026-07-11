@@ -5,9 +5,16 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 ## Features
 
 - **Groups**
-  - Create a group for each household or trip, with its own currency
+  - Create a group for each household or trip, with its own currency (picked from a curated list of ~25 common currencies)
+  - Edit a group's name, description, or currency later from its **Settings** tab (owner-only)
   - Add members by email (they must already have a TabSplit account)
   - Members can leave; owners can remove others — blocked while a balance is outstanding
+  - Owners can delete a group outright, removing all its expenses, recurring templates, settlements, and members
+  - Owners can promote another member to owner or demote a co-owner back to member — the last remaining owner can't be demoted or removed until someone else is promoted
+
+- **Deleting things**
+  - Any group member can delete an individual expense, recurring template, or settlement
+  - Owners can delete the group itself (Settings tab, with a confirmation step)
 
 - **Expenses**
   - Log one-off expenses with description, amount, category, and date
@@ -28,6 +35,12 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Email/password login with bcrypt-hashed passwords
   - "Continue with GitHub" OAuth login (links to an existing account by email, or creates a new one)
   - JWT stored in an HTTP-only cookie (7-day session)
+
+- **Account settings**
+  - A dedicated **Settings** page (linked from the navbar) with a danger zone for deleting your account
+  - Choose **delete only my own records** — you leave every group (ownership hands off automatically if you're the sole owner), and your profile is scrubbed to a "Deleted user" placeholder so shared expenses/settlements you were part of stay intact for other members
+  - Or choose **delete everything associated with me** — a full wipe: groups you solely own are deleted entirely, and anything you paid for or created elsewhere is removed too
+  - Requires typing `DELETE` to confirm before the button is enabled
 
 ## Getting Started
 
@@ -117,7 +130,15 @@ Open a group → **Recurring** tab → **Add recurring expense**. Choose an amou
 
 ### Settling up
 
-Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion (or **Record a payment** for an arbitrary amount) to log that someone paid someone back.
+Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion (or **Record a payment** for an arbitrary amount) to log that someone paid someone back. The same tab lists settlement history with a **Remove** option per entry.
+
+### Managing roles and deleting a group
+
+Open a group → **Settings** tab. Owners can edit the group's name, description, and currency, promote/demote members from the **Members** tab, and delete the group entirely from the danger zone (two-step confirmation).
+
+### Deleting your account
+
+Click **Settings** in the navbar → danger zone. Pick **delete only my own records** (recommended — preserves shared history for other members) or **delete everything associated with me** (full wipe), type `DELETE` to confirm, and submit.
 
 ## Technology Stack
 
@@ -141,31 +162,34 @@ Open a group → **Balances** tab to see who owes whom, plus a simplified list o
 src/
 ├── components/
 │   ├── AuthScreen.jsx           # Login/register
-│   ├── Navbar.jsx                # Top nav with logout
-│   ├── GroupsList.jsx            # Dashboard - list & create groups
-│   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Members)
+│   ├── Navbar.jsx                # Top nav with Settings link + logout
+│   ├── GroupsList.jsx            # Dashboard - list, create, and delete groups
+│   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Members/Settings)
 │   ├── AddExpenseForm.jsx        # Equal/exact split expense form
 │   ├── AddRecurringForm.jsx      # Recurring expense template form
 │   ├── AddMemberForm.jsx         # Add member by email
-│   ├── BalancesSummary.jsx       # Balances + settle-up suggestions
-│   └── SettleUpForm.jsx          # Record a manual settlement
+│   ├── BalancesSummary.jsx       # Balances + settle-up suggestions + settlement history
+│   ├── SettleUpForm.jsx          # Record a manual settlement
+│   └── AccountSettings.jsx       # Account danger zone (delete account, own/associated modes)
 ├── context/
 │   └── AppContext.jsx            # Auth state (user, login, register, logout)
 ├── utils/
 │   ├── api.js                    # Fetch client per resource
-│   └── categories.js             # Expense categories & currency formatting
+│   ├── categories.js             # Expense categories & currency formatting
+│   └── currencies.js             # Curated ISO currency list for pickers
 ├── App.jsx                       # Routes + auth gate
 ├── main.jsx                      # Entry point
 └── index.css                     # Tailwind entry point
 api/
-├── db.js                         # Neon client, auth/cookie helpers, requireGroupMember
+├── db.js                         # Neon client, auth/cookie helpers, requireGroupMember/Owner, isSoleOwner
 ├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
-├── groups.js                     # Group CRUD + membership + balances/settleUp
+├── groups.js                     # Group CRUD + membership + roles + balances/settleUp
 ├── expenses.js                   # Expense CRUD + split calculation
 ├── recurring.js                  # Recurring expense template CRUD
 ├── settlements.js                # Record/undo manual settlements
 ├── balances.js                   # computeBalances + simplifyDebts
 ├── recurrence.js                 # next-occurrence date math
+├── account.js                    # Account deletion (associated vs. own-records modes)
 └── cron/
     └── process-recurring.js      # Daily job: materializes due recurring expenses
 schema/

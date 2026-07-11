@@ -4,6 +4,7 @@ import AuthScreen from "./components/AuthScreen.jsx";
 import Navbar from "./components/Navbar.jsx";
 import GroupsList from "./components/GroupsList.jsx";
 import GroupDetail from "./components/GroupDetail.jsx";
+import AccountSettings from "./components/AccountSettings.jsx";
 
 export default function App() {
   const { user, loading } = useApp();
@@ -27,6 +28,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<GroupsList />} />
           <Route path="/groups/:id" element={<GroupDetail />} />
+          <Route path="/settings" element={<AccountSettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
