@@ -82,14 +82,14 @@ export function signToken(payload) {
 export function setAuthCookie(res, token) {
   appendSetCookie(
     res,
-    `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=Lax`
+    `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 7}; SameSite=None; Secure`
   );
 }
 
 export function clearAuthCookie(res) {
   appendSetCookie(
     res,
-    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`
+    `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=None; Secure`
   );
 }
 

@@ -25,7 +25,7 @@ export default function AddMemberForm({ groupId, onAdded }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2">
       <div className="flex-1 min-w-[200px]">
-        <label htmlFor="member-email" className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor="member-email" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Add member by email
         </label>
         <input
@@ -35,7 +35,7 @@ export default function AddMemberForm({ groupId, onAdded }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="roommate@example.com"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
       </div>
       <button
@@ -45,7 +45,7 @@ export default function AddMemberForm({ groupId, onAdded }) {
       >
         Add
       </button>
-      {error && <p className="w-full text-sm text-red-600">{error}</p>}
+      {error && <p className="w-full text-sm text-red-600 dark:text-red-400">{error}</p>}
     </form>
   );
 }

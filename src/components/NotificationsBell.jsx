@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import PropTypes from "prop-types";
 import { notificationsApi } from "../utils/api";
 
-export default function NotificationsBell() {
+export default function NotificationsBell({ align = "right" }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -50,7 +51,7 @@ export default function NotificationsBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Notifications"
-        className="relative shrink-0 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+        className="relative shrink-0 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
       >
         &#128276;
         {unreadCount > 0 && (
@@ -61,24 +62,28 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-10 mt-2 w-72 rounded-md border border-gray-200 bg-white shadow-lg">
+        <div
+          className={`absolute z-10 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg ${
+            align === "left" ? "left-0" : "right-0"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
             <span className="text-sm font-semibold">Notifications</span>
             {unreadCount > 0 && (
-              <button type="button" onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:underline">
+              <button type="button" onClick={handleMarkAllRead} className="text-xs text-brand-600 dark:text-brand-400 hover:underline">
                 Mark all read
               </button>
             )}
           </div>
           <ul className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <li className="px-3 py-4 text-center text-sm text-gray-400">No notifications yet</li>
+              <li className="px-3 py-4 text-center text-sm text-gray-400 dark:text-gray-500">No notifications yet</li>
             ) : (
               notifications.map((n) => (
                 <li
                   key={n.id}
                   className={`border-b border-gray-50 px-3 py-2 text-sm last:border-b-0 ${
-                    n.read_at ? "text-gray-400" : "text-gray-700"
+                    n.read_at ? "text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-300"
                   }`}
                 >
                   {n.group_id ? (
@@ -104,3 +109,7 @@ export default function NotificationsBell() {
     </div>
   );
 }
+
+NotificationsBell.propTypes = {
+  align: PropTypes.oneOf(["left", "right"]),
+};

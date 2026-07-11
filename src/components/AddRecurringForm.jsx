@@ -3,10 +3,10 @@ import PropTypes from "prop-types";
 import { recurringApi } from "../utils/api";
 import { CATEGORIES } from "../utils/categories";
 
-export default function AddRecurringForm({ groupId, members, onAdded, onCancel }) {
+export default function AddRecurringForm({ groupId, members, categories = CATEGORIES, onAdded, onCancel }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState(categories[0]);
   const [frequency, setFrequency] = useState("monthly");
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [paidBy, setPaidBy] = useState(members[0]?.id ?? "");
@@ -36,14 +36,14 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
-      <p className="text-xs text-gray-500">
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
         Recurring expenses are split equally among all current group members each time they run.
       </p>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label htmlFor="recurring-description" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-description" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Description
           </label>
           <input
@@ -52,12 +52,12 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="e.g. Rent, Netflix"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
         <div>
-          <label htmlFor="recurring-amount" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-amount" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Amount
           </label>
           <input
@@ -68,19 +68,19 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
             required
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
         <div>
-          <label htmlFor="recurring-frequency" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-frequency" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Frequency
           </label>
           <select
             id="recurring-frequency"
             value={frequency}
             onChange={(e) => setFrequency(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
@@ -88,7 +88,7 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
         </div>
 
         <div>
-          <label htmlFor="recurring-start" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-start" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Starts on
           </label>
           <input
@@ -97,21 +97,21 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
             required
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
 
         <div>
-          <label htmlFor="recurring-category" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-category" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Category
           </label>
           <select
             id="recurring-category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -120,14 +120,14 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
         </div>
 
         <div>
-          <label htmlFor="recurring-paid-by" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="recurring-paid-by" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Paid by
           </label>
           <select
             id="recurring-paid-by"
             value={paidBy}
             onChange={(e) => setPaidBy(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
             {members.map((m) => (
               <option key={m.id} value={m.id}>
@@ -138,7 +138,7 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="flex gap-2">
         <button
@@ -151,7 +151,7 @@ export default function AddRecurringForm({ groupId, members, onAdded, onCancel }
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
         >
           Cancel
         </button>
@@ -165,6 +165,7 @@ AddRecurringForm.propTypes = {
   members: PropTypes.arrayOf(
     PropTypes.shape({ id: PropTypes.number.isRequired, name: PropTypes.string.isRequired })
   ).isRequired,
+  categories: PropTypes.arrayOf(PropTypes.string),
   onAdded: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
 };

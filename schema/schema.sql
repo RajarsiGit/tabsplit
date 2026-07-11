@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS groups (
   description TEXT,
   currency VARCHAR(3) NOT NULL DEFAULT 'INR',
   created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  archived_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -91,6 +92,29 @@ CREATE TABLE IF NOT EXISTS expense_payments (
 
 CREATE INDEX IF NOT EXISTS idx_expense_payments_expense_id ON expense_payments(expense_id);
 CREATE INDEX IF NOT EXISTS idx_expense_payments_user_id ON expense_payments(user_id);
+
+-- Comments on an expense (discussion/disputes) - any group member can post one
+CREATE TABLE IF NOT EXISTS expense_comments (
+  id SERIAL PRIMARY KEY,
+  expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_comments_expense_id ON expense_comments(expense_id);
+
+-- Custom categories a group can add on top of the app's built-in defaults
+-- (see src/utils/categories.js CATEGORIES). expenses.category stays free-text,
+-- so this table only feeds the dropdown options offered to that group - it isn't
+-- a foreign key and nothing enforces an expense's category exists here.
+CREATE TABLE IF NOT EXISTS group_categories (
+  id SERIAL PRIMARY KEY,
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  name VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (group_id, name)
+);
 
 -- Invite links - one active token per group; regenerating replaces it
 CREATE TABLE IF NOT EXISTS group_invites (

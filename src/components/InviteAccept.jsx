@@ -25,8 +25,8 @@ export default function InviteAccept() {
   if (error) {
     return (
       <div className="mx-auto max-w-md text-center">
-        <p className="mb-4 text-sm text-red-600">{error}</p>
-        <Link to="/" className="text-sm font-medium text-brand-600 hover:underline">
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <Link to="/" className="text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Go home
         </Link>
       </div>
@@ -34,7 +34,7 @@ export default function InviteAccept() {
   }
 
   return (
-    <div className="mx-auto max-w-md text-center text-gray-500">
+    <div className="mx-auto max-w-md text-center text-gray-500 dark:text-gray-400">
       <p>Joining group...</p>
     </div>
   );

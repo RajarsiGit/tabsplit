@@ -32,11 +32,18 @@ export const authApi = {
 };
 
 export const groupsApi = {
-  list: () => request("/groups"),
+  list: (includeArchived) => request(`/groups${includeArchived ? "?includeArchived=true" : ""}`),
   get: (id) => request(`/groups?id=${id}`),
   create: (data) => request("/groups", { method: "POST", body: JSON.stringify(data) }),
   update: (id, data) => request("/groups", { method: "PUT", body: JSON.stringify({ id, ...data }) }),
   delete: (id) => request(`/groups?id=${id}`, { method: "DELETE" }),
+  setArchived: (id, archived) =>
+    request(`/groups?id=${id}&action=archive`, { method: "POST", body: JSON.stringify({ archived }) }),
+  listCategories: (id) => request(`/groups?id=${id}&action=categories`),
+  addCategory: (id, name) =>
+    request(`/groups?id=${id}&action=categories`, { method: "POST", body: JSON.stringify({ name }) }),
+  removeCategory: (id, name) =>
+    request(`/groups?id=${id}&action=categories&name=${encodeURIComponent(name)}`, { method: "DELETE" }),
   addMember: (id, email) =>
     request(`/groups?id=${id}&action=members`, { method: "POST", body: JSON.stringify({ email }) }),
   removeMember: (id, userId) =>
@@ -59,6 +66,11 @@ export const expensesApi = {
   create: (data) => request("/expenses", { method: "POST", body: JSON.stringify(data) }),
   update: (data) => request("/expenses", { method: "PUT", body: JSON.stringify(data) }),
   delete: (id) => request(`/expenses?id=${id}`, { method: "DELETE" }),
+  listComments: (id) => request(`/expenses?id=${id}&action=comments`),
+  addComment: (id, body) =>
+    request(`/expenses?id=${id}&action=comments`, { method: "POST", body: JSON.stringify({ body }) }),
+  deleteComment: (id, commentId) =>
+    request(`/expenses?id=${id}&action=comments&commentId=${commentId}`, { method: "DELETE" }),
 };
 
 export const recurringApi = {
@@ -77,7 +89,7 @@ export const invitesApi = {
 };
 
 export const notificationsApi = {
-  list: () => request("/notifications"),
+  list: (limit) => request(`/notifications${limit ? `?limit=${limit}` : ""}`),
   markRead: (id) => request(`/notifications?action=read&id=${id}`, { method: "POST" }),
   markAllRead: () => request("/notifications?action=read-all", { method: "POST" }),
 };

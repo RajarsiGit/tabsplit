@@ -117,20 +117,20 @@ export default function AccountSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/" className="mb-4 inline-block text-sm text-brand-600 hover:underline">
+        <Link to="/" className="mb-4 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline">
           &larr; Back to groups
         </Link>
         <h1 className="text-xl font-bold">Account settings</h1>
-        <p className="mt-1 text-sm text-gray-500">{user.email}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
       </div>
 
       <form
         onSubmit={handleSaveProfile}
-        className="space-y-3 rounded-lg border border-gray-200 bg-white p-4"
+        className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
       >
         <h2 className="font-semibold">Profile</h2>
         <div>
-          <label htmlFor="account-name" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="account-name" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Name
           </label>
           <input
@@ -138,10 +138,10 @@ export default function AccountSettings() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
-        {profileError && <p className="text-sm text-red-600">{profileError}</p>}
+        {profileError && <p className="text-sm text-red-600 dark:text-red-400">{profileError}</p>}
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -149,24 +149,24 @@ export default function AccountSettings() {
           >
             Save name
           </button>
-          {profileSaved && <span className="text-sm text-green-600">Saved</span>}
+          {profileSaved && <span className="text-sm text-green-600 dark:text-green-400">Saved</span>}
         </div>
       </form>
 
       <form
         onSubmit={handleChangePassword}
-        className="space-y-3 rounded-lg border border-gray-200 bg-white p-4"
+        className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
       >
         <h2 className="font-semibold">{user.has_password ? "Change password" : "Set a password"}</h2>
         {!user.has_password && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Your account currently only signs in with GitHub. Set a password to also enable
             email/password login.
           </p>
         )}
         {user.has_password && (
           <div>
-            <label htmlFor="current-password" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="current-password" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Current password
             </label>
             <input
@@ -175,12 +175,12 @@ export default function AccountSettings() {
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
         )}
         <div>
-          <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             New password
           </label>
           <input
@@ -190,11 +190,11 @@ export default function AccountSettings() {
             minLength={6}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
         <div>
-          <label htmlFor="confirm-password" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="confirm-password" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
             Confirm new password
           </label>
           <input
@@ -204,10 +204,10 @@ export default function AccountSettings() {
             minLength={6}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            className="w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>
-        {passwordError && <p className="text-sm text-red-600">{passwordError}</p>}
+        {passwordError && <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>}
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -215,18 +215,18 @@ export default function AccountSettings() {
           >
             {user.has_password ? "Update password" : "Set password"}
           </button>
-          {passwordSaved && <span className="text-sm text-green-600">Saved</span>}
+          {passwordSaved && <span className="text-sm text-green-600 dark:text-green-400">Saved</span>}
         </div>
       </form>
 
-      <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+      <div className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
         <h2 className="font-semibold">Connected accounts</h2>
-        {githubNotice && <p className="text-sm text-green-600">{githubNotice}</p>}
-        {githubError && <p className="text-sm text-red-600">{githubError}</p>}
+        {githubNotice && <p className="text-sm text-green-600 dark:text-green-400">{githubNotice}</p>}
+        {githubError && <p className="text-sm text-red-600 dark:text-red-400">{githubError}</p>}
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">GitHub</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               {user.has_github ? "Connected" : "Not connected"}
             </p>
           </div>
@@ -236,44 +236,44 @@ export default function AccountSettings() {
               disabled={githubBusy || !user.has_password}
               onClick={handleUnlinkGithub}
               title={!user.has_password ? "Set a password above before disconnecting GitHub" : undefined}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
             >
               Disconnect
             </button>
           ) : (
             <a
               href={authApi.githubLoginUrl}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
             >
               Connect GitHub
             </a>
           )}
         </div>
         {user.has_github && !user.has_password && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Set a password above before disconnecting GitHub, or you'll be locked out.
           </p>
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
         <h2 className="mb-1 font-semibold">Export your data</h2>
-        <p className="mb-3 text-sm text-gray-500">
+        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
           Download a JSON file of your groups, expenses, splits, recurring templates, and
           settlements.
         </p>
         <a
           href={accountApi.exportUrl}
           download="tabsplit-export.json"
-          className="inline-block rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          className="inline-block rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
         >
           Export my data
         </a>
       </div>
 
-      <div className="rounded-lg border border-red-200 bg-white p-4">
+      <div className="rounded-lg border border-red-200 dark:border-red-900 bg-white dark:bg-gray-800 p-4">
         <h2 className="mb-1 font-semibold text-red-700">Danger zone</h2>
-        <p className="mb-4 text-sm text-gray-500">
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           Deleting your account is permanent and cannot be undone.
         </p>
 
@@ -290,7 +290,7 @@ export default function AccountSettings() {
               <span>
                 <span className="font-medium">Delete only my own records (recommended)</span>
                 <br />
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   You&rsquo;ll leave every group. Any group you solely own is handed off to its
                   longest-standing other member, or deleted if you&rsquo;re the only member. Your
                   name, email, and password are scrubbed and replaced with &ldquo;Deleted
@@ -310,7 +310,7 @@ export default function AccountSettings() {
               <span>
                 <span className="font-medium">Delete everything associated with me</span>
                 <br />
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   Any group you solely own is deleted entirely &mdash; all its expenses, members,
                   recurring templates, and settlements, for everyone. In groups you don&rsquo;t
                   own, anything you paid for or created is also deleted, though the rest of that
@@ -321,7 +321,7 @@ export default function AccountSettings() {
           </fieldset>
 
           <div>
-            <label htmlFor="confirm-delete" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="confirm-delete" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
               Type DELETE to confirm
             </label>
             <input
@@ -329,11 +329,11 @@ export default function AccountSettings() {
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="DELETE"
-              className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full max-w-xs rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
 
-          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+          {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
 
           <button
             type="submit"

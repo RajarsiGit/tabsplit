@@ -27,6 +27,17 @@ export default async function handler(req, res) {
   try {
     const { id, action } = req.query;
 
+    // GET /api/groups?id=X&action=categories - custom categories this group added
+    if (req.method === "GET" && id && action === "categories") {
+      await requireGroupMember(sql, id, userId);
+
+      const categories = await sql`
+        SELECT name FROM group_categories WHERE group_id = ${id} ORDER BY name ASC
+      `;
+
+      return res.status(200).json(categories.map((c) => c.name));
+    }
+
     // GET /api/groups?id=X - single group with members and balances
     if (req.method === "GET" && id) {
       await requireGroupMember(sql, id, userId);
@@ -56,15 +67,27 @@ export default async function handler(req, res) {
     }
 
     // GET /api/groups - all groups current user belongs to, with their own balance in each
+    // Archived groups are excluded unless ?includeArchived=true is passed.
     if (req.method === "GET") {
-      const groups = await sql`
-        SELECT g.*, gm.role,
-          (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) AS member_count
-        FROM groups g
-        JOIN group_members gm ON gm.group_id = g.id
-        WHERE gm.user_id = ${userId}
-        ORDER BY g.created_at DESC
-      `;
+      const includeArchived = req.query.includeArchived === "true";
+
+      const groups = includeArchived
+        ? await sql`
+            SELECT g.*, gm.role,
+              (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) AS member_count
+            FROM groups g
+            JOIN group_members gm ON gm.group_id = g.id
+            WHERE gm.user_id = ${userId}
+            ORDER BY g.created_at DESC
+          `
+        : await sql`
+            SELECT g.*, gm.role,
+              (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) AS member_count
+            FROM groups g
+            JOIN group_members gm ON gm.group_id = g.id
+            WHERE gm.user_id = ${userId} AND g.archived_at IS NULL
+            ORDER BY g.created_at DESC
+          `;
 
       if (groups.length > 0) {
         const groupIds = groups.map((g) => g.id);
@@ -105,6 +128,40 @@ export default async function handler(req, res) {
       return res.status(200).json(groups);
     }
 
+    // POST /api/groups?id=X&action=categories - add a custom category
+    if (req.method === "POST" && id && action === "categories") {
+      await requireGroupMember(sql, id, userId);
+
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ error: "Category name is required" });
+      }
+
+      const normalized = name.trim().toLowerCase().slice(0, 50);
+
+      await sql`
+        INSERT INTO group_categories (group_id, name)
+        VALUES (${id}, ${normalized})
+        ON CONFLICT (group_id, name) DO NOTHING
+      `;
+
+      return res.status(201).json({ name: normalized });
+    }
+
+    // DELETE /api/groups?id=X&action=categories&name=X - remove a custom category (owner only)
+    if (req.method === "DELETE" && id && action === "categories") {
+      await requireGroupOwner(sql, id, userId);
+
+      const { name } = req.query;
+      if (!name) {
+        return res.status(400).json({ error: "name is required" });
+      }
+
+      await sql`DELETE FROM group_categories WHERE group_id = ${id} AND name = ${name}`;
+
+      return res.status(200).json({ message: "Category removed" });
+    }
+
     // POST /api/groups?id=X&action=members - add a member by email
     if (req.method === "POST" && id && action === "members") {
       await requireGroupMember(sql, id, userId);
@@ -142,6 +199,24 @@ export default async function handler(req, res) {
       });
 
       return res.status(201).json(newMember);
+    }
+
+    // POST /api/groups?id=X&action=archive - archive or unarchive a group (owner only)
+    if (req.method === "POST" && id && action === "archive") {
+      await requireGroupOwner(sql, id, userId);
+
+      const { archived } = req.body;
+
+      const result =
+        archived === false
+          ? await sql`UPDATE groups SET archived_at = NULL WHERE id = ${id} RETURNING *`
+          : await sql`UPDATE groups SET archived_at = CURRENT_TIMESTAMP WHERE id = ${id} RETURNING *`;
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+
+      return res.status(200).json(result[0]);
     }
 
     // POST /api/groups - create a new group

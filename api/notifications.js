@@ -28,15 +28,17 @@ export default async function handler(req, res) {
   const userId = auth.userId;
 
   try {
-    const { action, id } = req.query;
+    const { action, id, limit } = req.query;
 
-    // GET /api/notifications - recent notifications + unread count
+    // GET /api/notifications?limit=X - recent notifications + unread count (defaults to 30, capped at 200)
     if (req.method === "GET") {
+      const rowLimit = Math.min(Math.max(Number(limit) || 30, 1), 200);
+
       const notifications = await sql`
         SELECT * FROM notifications
         WHERE user_id = ${userId}
         ORDER BY created_at DESC
-        LIMIT 30
+        LIMIT ${rowLimit}
       `;
 
       const unread = await sql`

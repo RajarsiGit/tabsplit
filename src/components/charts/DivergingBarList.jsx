@@ -10,10 +10,10 @@ export default function DivergingBarList({ title, entries, currency }) {
   const maxAbs = Math.max(...entries.map((e) => Math.abs(e.value)), 1);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
       <h3 className="mb-3 font-semibold">{title}</h3>
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-500">No data yet.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">No data yet.</p>
       ) : (
         <div className="space-y-2">
           {entries.map((e) => {
@@ -22,11 +22,11 @@ export default function DivergingBarList({ title, entries, currency }) {
             const isNegative = e.value < -0.01;
             return (
               <div key={e.label} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 truncate text-sm text-gray-700" title={e.label}>
+                <span className="w-24 shrink-0 truncate text-sm text-gray-700 dark:text-gray-300" title={e.label}>
                   {e.label}
                 </span>
-                <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-gray-100">
-                  <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300" />
+                <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-gray-100 dark:bg-gray-700">
+                  <div className="absolute inset-y-0 left-1/2 w-px bg-gray-300 dark:bg-gray-500" />
                   {isPositive && (
                     <div
                       className="absolute inset-y-0 left-1/2 rounded-r"
@@ -42,7 +42,7 @@ export default function DivergingBarList({ title, entries, currency }) {
                 </div>
                 <span
                   className={`w-28 shrink-0 text-right text-sm font-medium ${
-                    isPositive ? "text-green-600" : isNegative ? "text-red-600" : "text-gray-400"
+                    isPositive ? "text-green-600 dark:text-green-400" : isNegative ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"
                   }`}
                 >
                   {isPositive

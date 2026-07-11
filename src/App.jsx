@@ -5,14 +5,17 @@ import Sidebar from "./components/Sidebar.jsx";
 import GroupsList from "./components/GroupsList.jsx";
 import GroupDetail from "./components/GroupDetail.jsx";
 import AllExpenses from "./components/AllExpenses.jsx";
+import SettleUp from "./components/SettleUp.jsx";
+import AllRecurring from "./components/AllRecurring.jsx";
+import Activity from "./components/Activity.jsx";
 import AccountSettings from "./components/AccountSettings.jsx";
 import InviteAccept from "./components/InviteAccept.jsx";
 
 function AuthedShell({ children }) {
   return (
-    <div className="flex min-h-screen flex-col sm:flex-row">
+    <div className="min-h-screen">
       <Sidebar />
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">
+      <main className="min-w-0 px-4 py-6 sm:ml-64 sm:px-8 sm:py-8">
         <div className="mx-auto max-w-5xl">{children}</div>
       </main>
     </div>
@@ -25,6 +28,9 @@ function MainRoutes() {
       <Route path="/" element={<GroupsList />} />
       <Route path="/groups/:id" element={<GroupDetail />} />
       <Route path="/expenses" element={<AllExpenses />} />
+      <Route path="/settle-up" element={<SettleUp />} />
+      <Route path="/recurring" element={<AllRecurring />} />
+      <Route path="/activity" element={<Activity />} />
       <Route path="/settings" element={<AccountSettings />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -36,7 +42,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-gray-400">
+      <div className="flex h-screen items-center justify-center text-gray-400 dark:text-gray-500">
         Loading...
       </div>
     );

@@ -19,6 +19,31 @@ function validateExactSplits(amount, participants) {
   return Math.abs(Math.round(total * 100) - Math.round(amount * 100)) <= 1;
 }
 
+// Splits `amount` proportionally by each participant's percentage, distributing
+// leftover pennies (from rounding) to the participants with the largest fractional
+// remainder first - the standard "largest remainder" apportionment method.
+function splitByPercentage(amount, participants) {
+  const cents = Math.round(amount * 100);
+  const raw = participants.map((p) => (cents * Number(p.percentage)) / 100);
+  const base = raw.map(Math.floor);
+  const allocated = base.reduce((sum, b) => sum + b, 0);
+  const remainder = cents - allocated;
+
+  const order = raw
+    .map((r, index) => ({ index, frac: r - base[index] }))
+    .sort((a, b) => b.frac - a.frac);
+
+  const centsPerParticipant = [...base];
+  for (let k = 0; k < remainder; k++) {
+    centsPerParticipant[order[k % order.length].index] += 1;
+  }
+
+  return participants.map((p, index) => ({
+    userId: p.userId,
+    shareAmount: centsPerParticipant[index] / 100,
+  }));
+}
+
 // Resolves the request's payer info into a normalized [{ userId, amount }] list -
 // either an explicit multi-payer `payments` array, or a single `paidBy` payer for
 // the full amount (the common case).
@@ -58,6 +83,12 @@ async function writeSplits(sql, expenseId, splitType, amount, participants) {
       throw new Error("Split amounts must add up to the total expense amount");
     }
     splits = participants.map((p) => ({ userId: p.userId, shareAmount: Number(p.shareAmount) }));
+  } else if (splitType === "percentage") {
+    const totalPct = participants.reduce((sum, p) => sum + Number(p.percentage), 0);
+    if (Math.abs(totalPct - 100) > 0.5) {
+      throw new Error("Percentages must add up to 100");
+    }
+    splits = splitByPercentage(amount, participants);
   } else {
     splits = splitEqually(
       amount,
@@ -96,7 +127,80 @@ export default async function handler(req, res) {
   const userId = auth.userId;
 
   try {
-    const { id, groupId } = req.query;
+    const { id, groupId, action } = req.query;
+
+    // GET /api/expenses?id=X&action=comments - list comments on an expense
+    if (req.method === "GET" && id && action === "comments") {
+      const expenses = await sql`SELECT group_id FROM expenses WHERE id = ${id}`;
+      if (expenses.length === 0) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      await requireGroupMember(sql, expenses[0].group_id, userId);
+
+      const comments = await sql`
+        SELECT ec.id, ec.body, ec.created_at, ec.user_id, u.name AS user_name
+        FROM expense_comments ec
+        JOIN users u ON u.id = ec.user_id
+        WHERE ec.expense_id = ${id}
+        ORDER BY ec.created_at ASC
+      `;
+
+      return res.status(200).json(comments);
+    }
+
+    // POST /api/expenses?id=X&action=comments - add a comment to an expense
+    if (req.method === "POST" && id && action === "comments") {
+      const expenses = await sql`SELECT group_id, description FROM expenses WHERE id = ${id}`;
+      if (expenses.length === 0) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      await requireGroupMember(sql, expenses[0].group_id, userId);
+
+      const { body } = req.body;
+      if (!body || !body.trim()) {
+        return res.status(400).json({ error: "Comment body is required" });
+      }
+
+      const result = await sql`
+        INSERT INTO expense_comments (expense_id, user_id, body)
+        VALUES (${id}, ${userId}, ${body.trim().slice(0, 2000)})
+        RETURNING id, body, created_at, user_id
+      `;
+
+      const [commenter, otherMembers] = await Promise.all([
+        sql`SELECT name FROM users WHERE id = ${userId}`,
+        sql`SELECT user_id FROM group_members WHERE group_id = ${expenses[0].group_id} AND user_id != ${userId}`,
+      ]);
+      for (const member of otherMembers) {
+        await createNotification(sql, {
+          userId: member.user_id,
+          groupId: expenses[0].group_id,
+          type: "expense_comment",
+          message: `${commenter[0].name} commented on "${expenses[0].description}"`,
+        });
+      }
+
+      return res.status(201).json({ ...result[0], user_name: commenter[0].name });
+    }
+
+    // DELETE /api/expenses?id=X&action=comments&commentId=Y - remove your own comment
+    if (req.method === "DELETE" && id && action === "comments") {
+      const commentId = req.query.commentId;
+      const comments = await sql`SELECT expense_id, user_id FROM expense_comments WHERE id = ${commentId}`;
+      if (comments.length === 0) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+      if (String(comments[0].expense_id) !== String(id)) {
+        return res.status(400).json({ error: "Comment does not belong to this expense" });
+      }
+      if (comments[0].user_id !== userId) {
+        return res.status(403).json({ error: "You can only remove your own comments" });
+      }
+
+      await sql`DELETE FROM expense_comments WHERE id = ${commentId}`;
+
+      return res.status(200).json({ message: "Comment removed" });
+    }
 
     // GET /api/expenses?id=X - single expense with splits
     if (req.method === "GET" && id) {

@@ -11,6 +11,8 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Members can leave; owners can remove others — blocked while a balance is outstanding
   - Owners can delete a group outright, removing all its expenses, recurring templates, settlements, and members
   - Owners can promote another member to owner or demote a co-owner back to member — the last remaining owner can't be demoted or removed until someone else is promoted
+  - **Archive** a group to hide it from your default groups list without deleting anything — unarchive any time (owner-only); a "Show archived groups" toggle on the dashboard reveals them again
+  - Add **custom categories** on top of the built-in defaults, scoped to that group, from its Settings tab (any member can add one; owners can remove them)
 
 - **Deleting things**
   - Any group member can delete an individual expense, recurring template, or settlement
@@ -18,10 +20,13 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 
 - **Expenses**
   - Log one-off expenses with description, amount, category, and date
-  - Split **equally** among selected participants, or enter **exact** custom amounts per person
+  - **Edit an existing expense** — the same form used to add one, prefilled, including its split and payer setup
+  - Split **equally**, enter **exact** custom amounts per person, or split by **percentage** (per-person `%` inputs, validated to add up to 100)
   - Rounding remainders are distributed automatically so splits always add up to the penny
   - **Split the payment itself** across more than one payer (e.g. two roommates who split fronting the cost of one grocery run) instead of a single "paid by"
   - Attach a **receipt photo** to an expense (uploaded directly to Vercel Blob storage)
+  - **Comment** on an expense — any group member can post one, and only the author can remove their own
+  - Search, filter by category, and sort a group's expense list (by date or amount); a sidebar **All Expenses** page does the same across every group you're in, with an added "paid by me" filter and a per-currency total
 
 - **Invite links**
   - Group owners can generate a shareable invite link from the group's Settings tab
@@ -29,22 +34,27 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Regenerate to invalidate the old link, or revoke it entirely
 
 - **Notifications**
-  - In-app notification bell in the navbar — no email required
-  - Notified when you're added to a group, your role changes, a new expense is logged, or someone records a settlement with you
+  - In-app notification bell in the sidebar, plus a full **Activity** page for browsing further back — no email required
+  - Notified when you're added to a group, your role changes, a new expense or comment is logged, someone records a settlement with you, or you have an outstanding balance a weekly reminder job flags
   - Unread badge count, mark one or all as read
 
 - **Insights**
   - A group's **Insights** tab shows spend-by-category and paid-by-member bar charts, computed from that group's expenses
+  - The **Dashboard** adds a spend-over-time chart (last 6 months) alongside net balance, total spent, spend-by-category, and balance-by-group, one section per currency your groups use
 
 - **Recurring expenses**
   - Set up templates for rent, utilities, subscriptions, etc. with a weekly or monthly frequency
   - A daily scheduled job materializes each due template into a real expense and advances it to the next occurrence
   - Always split equally across whoever is currently in the group — no need to remember a fixed participant list
+  - **Pause or resume** a template without deleting it — paused templates are skipped by the daily job
+  - A sidebar **Recurring** page lists upcoming (and, optionally, paused) templates across every group
 
 - **Balances & settling up**
   - See each member's live balance (owed vs. owes) for a group
   - Automatic debt simplification suggests the minimum set of payments needed to settle everyone up
   - Record a manual payment ("I paid you back $20") to clear a debt, with an optional note
+  - A sidebar **Settle Up** page surfaces every group's outstanding suggestions in one place
+  - A weekly scheduled job reminds anyone with an outstanding balance who they owe and how much
 
 - **Authentication**
   - Email/password login with bcrypt-hashed passwords
@@ -52,15 +62,19 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - JWT stored in an HTTP-only cookie (7-day session)
 
 - **Account settings**
-  - A dedicated **Settings** page (linked from the navbar)
+  - A dedicated **Settings** page (linked from the sidebar)
   - Edit your display name
   - Change your password, or **set one for the first time** if you originally signed up via GitHub only
   - Connect or disconnect GitHub from an existing account (disconnecting is blocked if you have no password set, to avoid locking yourself out)
-  - **Export your data** — download a JSON snapshot of your groups, expenses, splits, recurring templates, and settlements
+  - **Export your data** — download a JSON snapshot of your groups, expenses, splits, recurring templates, and settlements (also available directly from the sidebar's user menu)
   - A danger zone for deleting your account:
     - Choose **delete only my own records** — you leave every group (ownership hands off automatically if you're the sole owner), and your profile is scrubbed to a "Deleted user" placeholder so shared expenses/settlements you were part of stay intact for other members
     - Or choose **delete everything associated with me** — a full wipe: groups you solely own are deleted entirely, and anything you paid for or created elsewhere is removed too
     - Requires typing `DELETE` to confirm before the button is enabled
+
+- **Navigation & personalization**
+  - A left sidebar (collapsing to a hamburger-triggered drawer on mobile) with Dashboard, All Expenses, Settle Up, Recurring, Activity, and Settings, plus a collapsible "Your groups" quick-switcher so you can jump straight to a group
+  - **Light / dark / system** theme toggle, persisted across sessions
 
 ## Getting Started
 
@@ -69,7 +83,7 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 - Node.js v18 or higher
 - npm
 - A [Neon](https://console.neon.tech/signup) account for Postgres
-- A [Vercel](https://vercel.com/signup) account (for `vercel dev` / deployment / the recurring-expense cron job)
+- A [Vercel](https://vercel.com/signup) account (for `vercel dev` / deployment / the scheduled cron jobs)
 
 ### Local Development Setup
 
@@ -101,14 +115,15 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
    - Create a project at [console.neon.tech](https://console.neon.tech)
    - Run the SQL in `schema/schema.sql` against it (Neon SQL Editor, or `psql $DATABASE_URL -f schema/schema.sql`)
    - If your app connects as a non-owner role (e.g. a dedicated `tabsplit` role rather than the default `neondb_owner`), also run `schema/permissions.sql` from the Neon Console's SQL Editor once, so that role can read/write the tables it doesn't own
+   - Adding a column to a table that already exists (e.g. a future `ALTER TABLE`) always needs the Neon Console's SQL Editor too, for the same non-owner-role reason — see the "Neon role/ownership gotcha" in [CLAUDE.md](./CLAUDE.md)
 
 4. **Run the app:**
    ```bash
-   npm run dev       # frontend only, http://localhost:5173 (proxies /api to :3000)
+   npm run dev       # frontend only, http://localhost:5173
    npm run dev:api   # in another terminal - serves api/* via `vercel dev` on :3000
    ```
 
-   `npm run dev:api` requires the project to be linked to Vercel first (`vercel link`) so it can read your environment variables; alternatively run `vercel env pull` after linking to generate a local `.env`.
+   By default, `npm run dev`'s dev-server proxy (`vite.config.js`) points `/api/*` at a live deployed instance of this app, not `npm run dev:api`'s `localhost:3000` — so out of the box, local frontend work talks to whatever database that deployment uses. To develop against your own local API/database instead, change the `server.proxy` target in `vite.config.js` back to `http://localhost:3000` and run `npm run dev:api` alongside `npm run dev`. That command requires the project to be linked to Vercel first (`vercel link`) so it can read your environment variables; alternatively run `vercel env pull` after linking to generate a local `.env`.
 
 5. Open `http://localhost:5173` and create an account.
 
@@ -122,7 +137,7 @@ Output goes to `dist/`.
 
 ### Deploying
 
-The app is set up to deploy on Vercel as-is (`vercel.json` configures the build, API rewrites, and the recurring-expense cron schedule):
+The app is set up to deploy on Vercel as-is (`vercel.json` configures the build, API rewrites, and the two cron schedules):
 
 ```bash
 vercel link
@@ -131,7 +146,9 @@ vercel env pull                     # sync DATABASE_URL / JWT_SECRET locally
 vercel deploy --prod
 ```
 
-Vercel automatically injects a `CRON_SECRET` for scheduled invocations of `api/cron/process-recurring.js`; no extra setup needed.
+Vercel automatically injects a `CRON_SECRET` for scheduled invocations of `api/cron/process-recurring.js` (daily, materializes due recurring expenses) and `api/cron/settle-up-reminders.js` (weekly, nudges anyone with an outstanding balance); no extra setup needed.
+
+Before deploying a change that adds or alters a table, apply the corresponding schema change first (see step 3 above) — the deployed API will otherwise throw on any request that touches the missing table/column.
 
 ## Usage
 
@@ -148,8 +165,17 @@ Open a group → **Members** tab → enter the email of another registered TabSp
 Open a group → **Expenses** tab → **Add expense**. Choose who paid, the amount, category, and date, then either:
 - **Equally** — pick which members are in on the expense; the amount is divided evenly
 - **Exact amounts** — enter each participant's share directly (must add up to the total)
+- **Percentages** — enter each participant's share as a `%`; the running total must add up to 100
 
-Check **Split the payment too** if more than one person fronted the money — pick each payer and how much they paid (must add up to the total). Optionally attach a receipt photo.
+Check **Split the payment too** if more than one person fronted the money — pick each payer and how much they paid (must add up to the total). Optionally attach a receipt photo. Once added, click **Edit** on any expense to reopen the same form prefilled, or **Comments** to discuss it with the group.
+
+### Custom categories
+
+Open a group → **Settings** tab → **Categories**. Any member can add a category name specific to that group; it shows up alongside the built-in defaults in that group's expense/recurring forms and filters. Owners can remove one.
+
+### Browsing across groups
+
+The sidebar's **All Expenses**, **Settle Up**, and **Recurring** pages each aggregate that resource across every group you're in — useful for a quick "what do I owe overall" or "what's coming up" check without opening groups one at a time. **Activity** is the full notification history behind the bell icon.
 
 ### Inviting people via link
 
@@ -157,19 +183,23 @@ Open a group → **Settings** tab → **Invite link** (owner-only). Click **Gene
 
 ### Setting up a recurring expense
 
-Open a group → **Recurring** tab → **Add recurring expense**. Choose an amount, category, frequency (weekly/monthly), and start date. Each time it's due, TabSplit generates a real expense split equally across the group's current members and schedules the next occurrence.
+Open a group → **Recurring** tab → **Add recurring expense**. Choose an amount, category, frequency (weekly/monthly), and start date. Each time it's due, TabSplit generates a real expense split equally across the group's current members and schedules the next occurrence. **Pause** a template to stop it generating without deleting it; **Resume** to pick back up.
 
 ### Settling up
 
-Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion (or **Record a payment** for an arbitrary amount) to log that someone paid someone back. The same tab lists settlement history with a **Remove** option per entry.
+Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion (or **Record a payment** for an arbitrary amount) to log that someone paid someone back. The same tab lists settlement history with a **Remove** option per entry. If a balance goes unpaid, expect a weekly reminder notification.
 
-### Managing roles and deleting a group
+### Managing roles, archiving, and deleting a group
 
-Open a group → **Settings** tab. Owners can edit the group's name, description, and currency, promote/demote members from the **Members** tab, and delete the group entirely from the danger zone (two-step confirmation).
+Open a group → **Settings** tab. Owners can edit the group's name, description, and currency, promote/demote members from the **Members** tab, **archive** the group (hides it from the default list, reversible) or delete it entirely from the danger zone (two-step confirmation, not reversible).
 
 ### Managing your profile, password, and connected accounts
 
-Click **Settings** in the navbar. Update your name, change (or set) your password, and connect/disconnect GitHub sign-in. Disconnecting GitHub is blocked until you've set a password, so you can't lock yourself out.
+Click **Settings** in the sidebar. Update your name, change (or set) your password, and connect/disconnect GitHub sign-in. Disconnecting GitHub is blocked until you've set a password, so you can't lock yourself out.
+
+### Switching themes
+
+Open the user menu at the bottom of the sidebar → **Appearance** → Light, Dark, or System.
 
 ### Exporting your data
 
@@ -189,7 +219,7 @@ Settings → danger zone. Pick **delete only my own records** (recommended — p
 
 ### Backend
 - **Vercel Serverless Functions** — API endpoints (`api/*.js`)
-- **Vercel Cron** — daily job to materialize recurring expenses
+- **Vercel Cron** — daily job to materialize recurring expenses, weekly job for settle-up reminders
 - **Vercel Blob** — receipt image storage
 - **Neon Postgres** — database
 - **@neondatabase/serverless** — database driver
@@ -202,23 +232,36 @@ Settings → danger zone. Pick **delete only my own records** (recommended — p
 src/
 ├── components/
 │   ├── AuthScreen.jsx           # Login/register
-│   ├── Navbar.jsx                # Top nav with notifications bell, Settings link, logout
+│   ├── Sidebar.jsx               # Fixed left nav (desktop) / hamburger + drawer (mobile); brand, bell, nav links, GroupSwitcher, UserMenu
+│   ├── GroupSwitcher.jsx         # Collapsible "Your groups" quick-jump list in the sidebar
 │   ├── NotificationsBell.jsx     # Notification badge + dropdown, polls every 30s
-│   ├── GroupsList.jsx            # Dashboard - list, create, and delete groups
+│   ├── GroupsList.jsx            # Dashboard - stats, list/create/archive/delete groups
+│   ├── Dashboard.jsx             # Net balance, total spent, spend-over-time chart, spend-by-category, balance-by-group
+│   ├── AllExpenses.jsx           # Cross-group expense list with search/category/payer filters
+│   ├── SettleUp.jsx              # Cross-group settle-up suggestions
+│   ├── AllRecurring.jsx          # Cross-group upcoming (and paused) recurring templates
+│   ├── Activity.jsx              # Full notification history
 │   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Insights/Members/Settings)
-│   ├── AddExpenseForm.jsx        # Equal/exact split, multi-payer, and receipt upload
+│   ├── AddExpenseForm.jsx        # Add or edit an expense - equal/exact/percentage split, multi-payer, receipt upload
+│   ├── ExpenseComments.jsx       # Comment thread for one expense, used inline in GroupDetail
 │   ├── AddRecurringForm.jsx      # Recurring expense template form
 │   ├── AddMemberForm.jsx         # Add member by email
 │   ├── BalancesSummary.jsx       # Balances + settle-up suggestions + settlement history
 │   ├── SettleUpForm.jsx          # Record a manual settlement
 │   ├── InsightsTab.jsx           # Spend-by-category / paid-by-member bar charts
+│   ├── charts/
+│   │   ├── BarList.jsx            # Magnitude bar list (spend by category, etc.)
+│   │   ├── DivergingBarList.jsx   # Signed bar list (balance by group)
+│   │   ├── SpendOverTimeChart.jsx # Monthly spend bar chart
+│   │   └── palette.js             # Validated categorical color palette
 │   ├── InviteAccept.jsx          # /invite/:token destination - joins the group, then redirects
 │   └── AccountSettings.jsx       # Account danger zone (delete account, own/associated modes)
 ├── context/
-│   └── AppContext.jsx            # Auth state (user, login, register, logout)
+│   ├── AppContext.jsx            # Auth state (user, login, register, logout)
+│   └── ThemeContext.jsx          # Light/dark/system theme, persisted to localStorage
 ├── utils/
 │   ├── api.js                    # Fetch client per resource
-│   ├── categories.js             # Expense categories & currency formatting
+│   ├── categories.js             # Built-in expense categories, currency formatting, mergeCategories()
 │   └── currencies.js             # Curated ISO currency list for pickers
 ├── App.jsx                       # Route-aware auth gating (see CLAUDE.md)
 ├── main.jsx                      # Entry point
@@ -227,18 +270,20 @@ api/
 ├── _lib/                         # Shared helpers - not Serverless Functions (see CLAUDE.md)
 │   ├── db.js                     # Neon client, auth/cookie helpers, requireGroupMember/Owner, isSoleOwner
 │   ├── balances.js               # computeBalances + simplifyDebts
-│   └── recurrence.js             # next-occurrence date math
+│   ├── recurrence.js             # next-occurrence date math
+│   └── format.js                 # formatCurrency (backend mirror of the frontend helper)
 ├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
-├── groups.js                     # Group CRUD + membership + roles + balances/settleUp
-├── expenses.js                   # Expense CRUD + split + multi-payer calculation + receipts
-├── recurring.js                  # Recurring expense template CRUD
+├── groups.js                     # Group CRUD + membership + roles + balances/settleUp + archive + categories
+├── expenses.js                   # Expense CRUD + split (equal/exact/percentage) + multi-payer + receipts + comments
+├── recurring.js                  # Recurring expense template CRUD (incl. active/pause toggle)
 ├── settlements.js                # Record/undo manual settlements
 ├── account.js                    # Account deletion (associated vs. own-records modes)
 ├── invites.js                    # Group invite link generate/revoke/preview/accept
-├── notifications.js              # In-app notifications - list, mark read, createNotification()
+├── notifications.js              # In-app notifications - list (?limit=), mark read, createNotification()
 ├── blob-upload.js                # Vercel Blob client-upload handler for receipts
 └── cron/
-    └── process-recurring.js      # Daily job: materializes due recurring expenses
+    ├── process-recurring.js      # Daily job: materializes due recurring expenses
+    └── settle-up-reminders.js    # Weekly job: notifies anyone with an outstanding balance
 schema/
 └── schema.sql                    # Complete database schema
 ```
