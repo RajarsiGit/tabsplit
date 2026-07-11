@@ -25,7 +25,7 @@ export default function GroupDetail() {
 
   const [settingsName, setSettingsName] = useState("");
   const [settingsDescription, setSettingsDescription] = useState("");
-  const [settingsCurrency, setSettingsCurrency] = useState("USD");
+  const [settingsCurrency, setSettingsCurrency] = useState("INR");
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [confirmingDeleteGroup, setConfirmingDeleteGroup] = useState(false);
   const [memberBusyId, setMemberBusyId] = useState(null);

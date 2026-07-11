@@ -21,11 +21,14 @@ CREATE TABLE IF NOT EXISTS groups (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+  currency VARCHAR(3) NOT NULL DEFAULT 'INR',
   created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Safe to re-run against a database created before the default currency changed to INR
+ALTER TABLE groups ALTER COLUMN currency SET DEFAULT 'INR';
 
 -- Group membership
 CREATE TABLE IF NOT EXISTS group_members (

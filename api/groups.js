@@ -108,12 +108,12 @@ export default async function handler(req, res) {
       }
 
       if (currency !== undefined && !isValidCurrency(currency)) {
-        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. USD" });
+        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. INR" });
       }
 
       const result = await sql`
         INSERT INTO groups (name, description, currency, created_by)
-        VALUES (${name}, ${description || null}, ${currency || "USD"}, ${userId})
+        VALUES (${name}, ${description || null}, ${currency || "INR"}, ${userId})
         RETURNING *
       `;
 
@@ -138,7 +138,7 @@ export default async function handler(req, res) {
       await requireGroupOwner(sql, bodyId, userId);
 
       if (currency !== undefined && !isValidCurrency(currency)) {
-        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. USD" });
+        return res.status(400).json({ error: "Currency must be a 3-letter code, e.g. INR" });
       }
 
       const result = await sql`

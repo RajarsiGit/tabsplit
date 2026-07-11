@@ -10,7 +10,7 @@ export default function GroupsList() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("INR");
   const [confirmingId, setConfirmingId] = useState(null);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function GroupsList() {
       await groupsApi.create({ name, description, currency });
       setName("");
       setDescription("");
-      setCurrency("USD");
+      setCurrency("INR");
       setShowForm(false);
       loadGroups();
     } catch (err) {
