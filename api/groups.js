@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // GET /api/groups - all groups current user belongs to
+    // GET /api/groups - all groups current user belongs to, with their own balance in each
     if (req.method === "GET") {
       const groups = await sql`
         SELECT g.*, gm.role,
@@ -65,6 +65,42 @@ export default async function handler(req, res) {
         WHERE gm.user_id = ${userId}
         ORDER BY g.created_at DESC
       `;
+
+      if (groups.length > 0) {
+        const groupIds = groups.map((g) => g.id);
+
+        const [paidRows, owedRows, sentRows, receivedRows] = await Promise.all([
+          sql`
+            SELECT e.group_id, SUM(ep.amount) AS total
+            FROM expense_payments ep
+            JOIN expenses e ON e.id = ep.expense_id
+            WHERE ep.user_id = ${userId} AND e.group_id = ANY(${groupIds})
+            GROUP BY e.group_id
+          `,
+          sql`
+            SELECT e.group_id, SUM(es.share_amount) AS total
+            FROM expense_splits es
+            JOIN expenses e ON e.id = es.expense_id
+            WHERE es.user_id = ${userId} AND e.group_id = ANY(${groupIds})
+            GROUP BY e.group_id
+          `,
+          sql`SELECT group_id, SUM(amount) AS total FROM settlements WHERE from_user = ${userId} AND group_id = ANY(${groupIds}) GROUP BY group_id`,
+          sql`SELECT group_id, SUM(amount) AS total FROM settlements WHERE to_user = ${userId} AND group_id = ANY(${groupIds}) GROUP BY group_id`,
+        ]);
+
+        const balanceByGroup = {};
+        const add = (groupId, amount) => {
+          balanceByGroup[groupId] = (balanceByGroup[groupId] || 0) + Number(amount);
+        };
+        for (const row of paidRows) add(row.group_id, row.total);
+        for (const row of owedRows) add(row.group_id, -row.total);
+        for (const row of sentRows) add(row.group_id, row.total);
+        for (const row of receivedRows) add(row.group_id, -row.total);
+
+        for (const group of groups) {
+          group.my_balance = Math.round((balanceByGroup[group.id] || 0) * 100) / 100;
+        }
+      }
 
       return res.status(200).json(groups);
     }

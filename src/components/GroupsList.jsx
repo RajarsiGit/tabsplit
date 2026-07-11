@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { groupsApi } from "../utils/api";
+import { groupsApi, expensesApi } from "../utils/api";
 import { CURRENCIES } from "../utils/currencies";
+import Dashboard from "./Dashboard.jsx";
 
 export default function GroupsList() {
   const [groups, setGroups] = useState([]);
+  const [expensesByGroup, setExpensesByGroup] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -21,7 +23,13 @@ export default function GroupsList() {
     setLoading(true);
     groupsApi
       .list()
-      .then(setGroups)
+      .then(async (data) => {
+        setGroups(data);
+        const entries = await Promise.all(
+          data.map((g) => expensesApi.listForGroup(g.id).then((exps) => [g.id, exps]).catch(() => [g.id, []]))
+        );
+        setExpensesByGroup(Object.fromEntries(entries));
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
@@ -129,6 +137,8 @@ export default function GroupsList() {
           </button>
         </form>
       )}
+
+      {!loading && <Dashboard groups={groups} expensesByGroup={expensesByGroup} />}
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading...</p>
