@@ -1,4 +1,4 @@
-import { getDb, requireAuth, setCors, requireGroupMember } from "./db.js";
+import { getDb, requireAuth, setCors, requireGroupMember } from "./_lib/db.js";
 import { createNotification } from "./notifications.js";
 
 export default async function handler(req, res) {

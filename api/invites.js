@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { getDb, requireAuth, setCors, requireGroupOwner } from "./db.js";
+import { getDb, requireAuth, setCors, requireGroupOwner } from "./_lib/db.js";
 
 export default async function handler(req, res) {
   setCors(req, res);

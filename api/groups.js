@@ -1,5 +1,5 @@
-import { getDb, requireAuth, setCors, requireGroupMember, requireGroupOwner, isSoleOwner } from "./db.js";
-import { computeBalances, simplifyDebts } from "./balances.js";
+import { getDb, requireAuth, setCors, requireGroupMember, requireGroupOwner, isSoleOwner } from "./_lib/db.js";
+import { computeBalances, simplifyDebts } from "./_lib/balances.js";
 import { createNotification } from "./notifications.js";
 
 function isValidCurrency(code) {

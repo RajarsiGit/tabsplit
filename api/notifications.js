@@ -1,4 +1,4 @@
-import { getDb, requireAuth, setCors } from "./db.js";
+import { getDb, requireAuth, setCors } from "./_lib/db.js";
 
 // Reusable by other handlers (groups.js, expenses.js, settlements.js) to push a
 // notification without going through HTTP.

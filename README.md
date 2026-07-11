@@ -100,6 +100,7 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 3. **Initialize the database:**
    - Create a project at [console.neon.tech](https://console.neon.tech)
    - Run the SQL in `schema/schema.sql` against it (Neon SQL Editor, or `psql $DATABASE_URL -f schema/schema.sql`)
+   - If your app connects as a non-owner role (e.g. a dedicated `tabsplit` role rather than the default `neondb_owner`), also run `schema/permissions.sql` from the Neon Console's SQL Editor once, so that role can read/write the tables it doesn't own
 
 4. **Run the app:**
    ```bash
@@ -223,14 +224,15 @@ src/
 ├── main.jsx                      # Entry point
 └── index.css                     # Tailwind entry point
 api/
-├── db.js                         # Neon client, auth/cookie helpers, requireGroupMember/Owner, isSoleOwner
+├── _lib/                         # Shared helpers - not Serverless Functions (see CLAUDE.md)
+│   ├── db.js                     # Neon client, auth/cookie helpers, requireGroupMember/Owner, isSoleOwner
+│   ├── balances.js               # computeBalances + simplifyDebts
+│   └── recurrence.js             # next-occurrence date math
 ├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
 ├── groups.js                     # Group CRUD + membership + roles + balances/settleUp
 ├── expenses.js                   # Expense CRUD + split + multi-payer calculation + receipts
 ├── recurring.js                  # Recurring expense template CRUD
 ├── settlements.js                # Record/undo manual settlements
-├── balances.js                   # computeBalances + simplifyDebts
-├── recurrence.js                 # next-occurrence date math
 ├── account.js                    # Account deletion (associated vs. own-records modes)
 ├── invites.js                    # Group invite link generate/revoke/preview/accept
 ├── notifications.js              # In-app notifications - list, mark read, createNotification()

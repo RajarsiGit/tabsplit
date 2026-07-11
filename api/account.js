@@ -1,4 +1,4 @@
-import { getDb, requireAuth, setCors, clearAuthCookie } from "./db.js";
+import { getDb, requireAuth, setCors, clearAuthCookie } from "./_lib/db.js";
 
 // Groups where userId is the owner and no one else currently holds the owner role there.
 async function findSoleOwnedGroupIds(sql, userId) {

@@ -11,7 +11,7 @@ import {
   setOAuthStateCookie,
   clearOAuthStateCookie,
   OAUTH_STATE_COOKIE_NAME,
-} from "./db.js";
+} from "./_lib/db.js";
 
 const GITHUB_USER_AGENT = "TabSplit";
 

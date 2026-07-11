@@ -1,6 +1,6 @@
-import { getDb } from "../db.js";
+import { getDb } from "../_lib/db.js";
 import { splitEqually } from "../expenses.js";
-import { nextOccurrence } from "../recurrence.js";
+import { nextOccurrence } from "../_lib/recurrence.js";
 
 // Vercel Cron job (see vercel.json "crons") - runs daily and materializes any
 // recurring expense templates that are due, then advances their next_occurrence.

@@ -1,5 +1,5 @@
 import { handleUpload } from "@vercel/blob/client";
-import { requireAuth, setCors } from "./db.js";
+import { requireAuth, setCors } from "./_lib/db.js";
 
 const MAX_SIZE_BYTES = 8 * 1024 * 1024;
 
