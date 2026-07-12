@@ -1,4 +1,4 @@
-import { getDb, requireAuth, setCors } from "./_lib/db.js";
+import { getDb, requireAuth, setCors, requireGroupMember } from "./_lib/db.js";
 
 // Reusable by other handlers (groups.js, expenses.js, settlements.js) to push a
 // notification without going through HTTP.
@@ -28,7 +28,26 @@ export default async function handler(req, res) {
   const userId = auth.userId;
 
   try {
-    const { action, id, limit } = req.query;
+    const { action, id, limit, groupId, scope } = req.query;
+
+    // GET /api/notifications?groupId=X&scope=group - shared activity feed for a group
+    // (any member can view; reuses `notifications`, collapsing the fan-out duplicates
+    // that multi-recipient events produce into one row per event)
+    if (req.method === "GET" && groupId && scope === "group") {
+      await requireGroupMember(sql, groupId, userId);
+
+      const rowLimit = Math.min(Math.max(Number(limit) || 30, 1), 200);
+
+      const rows = await sql`
+        SELECT DISTINCT ON (type, message, created_at) id, type, message, created_at, user_id
+        FROM notifications
+        WHERE group_id = ${groupId}
+        ORDER BY type, message, created_at DESC, id DESC
+        LIMIT ${rowLimit}
+      `;
+
+      return res.status(200).json(rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+    }
 
     // GET /api/notifications?limit=X - recent notifications + unread count (defaults to 30, capped at 200)
     if (req.method === "GET") {

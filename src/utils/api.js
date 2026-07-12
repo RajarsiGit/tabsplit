@@ -44,6 +44,13 @@ export const groupsApi = {
     request(`/groups?id=${id}&action=categories`, { method: "POST", body: JSON.stringify({ name }) }),
   removeCategory: (id, name) =>
     request(`/groups?id=${id}&action=categories&name=${encodeURIComponent(name)}`, { method: "DELETE" }),
+  listBudgets: (id) => request(`/groups?id=${id}&action=budgets`),
+  createBudget: (id, data) =>
+    request(`/groups?id=${id}&action=budgets`, { method: "POST", body: JSON.stringify(data) }),
+  updateBudget: (id, budgetId, data) =>
+    request(`/groups?id=${id}&action=budgets`, { method: "PUT", body: JSON.stringify({ budgetId, ...data }) }),
+  deleteBudget: (id, budgetId) =>
+    request(`/groups?id=${id}&action=budgets&budgetId=${budgetId}`, { method: "DELETE" }),
   addMember: (id, email) =>
     request(`/groups?id=${id}&action=members`, { method: "POST", body: JSON.stringify({ email }) }),
   removeMember: (id, userId) =>
@@ -71,6 +78,8 @@ export const expensesApi = {
     request(`/expenses?id=${id}&action=comments`, { method: "POST", body: JSON.stringify({ body }) }),
   deleteComment: (id, commentId) =>
     request(`/expenses?id=${id}&action=comments&commentId=${commentId}`, { method: "DELETE" }),
+  exportUrl: (groupId) => `${BASE_URL}/expenses?groupId=${groupId}&action=export`,
+  listItems: (id) => request(`/expenses?id=${id}&action=items`),
 };
 
 export const recurringApi = {
@@ -92,10 +101,13 @@ export const notificationsApi = {
   list: (limit) => request(`/notifications${limit ? `?limit=${limit}` : ""}`),
   markRead: (id) => request(`/notifications?action=read&id=${id}`, { method: "POST" }),
   markAllRead: () => request("/notifications?action=read-all", { method: "POST" }),
+  listForGroup: (groupId, limit) =>
+    request(`/notifications?groupId=${groupId}&scope=group${limit ? `&limit=${limit}` : ""}`),
 };
 
 export const settlementsApi = {
   listForGroup: (groupId) => request(`/settlements?groupId=${groupId}`),
   create: (data) => request("/settlements", { method: "POST", body: JSON.stringify(data) }),
   delete: (id) => request(`/settlements?id=${id}`, { method: "DELETE" }),
+  nudge: (data) => request("/settlements?action=nudge", { method: "POST", body: JSON.stringify(data) }),
 };

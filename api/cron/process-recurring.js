@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     const due = await sql`
       SELECT * FROM recurring_expenses
       WHERE active = TRUE AND next_occurrence <= CURRENT_DATE
+        AND (end_date IS NULL OR next_occurrence <= end_date)
     `;
 
     const created = [];
@@ -58,9 +59,11 @@ export default async function handler(req, res) {
         new Date(template.next_occurrence).toISOString().slice(0, 10),
         template.frequency
       );
+      const endDateStr = template.end_date ? new Date(template.end_date).toISOString().slice(0, 10) : null;
+      const stillActive = !(endDateStr && next > endDateStr);
 
       await sql`
-        UPDATE recurring_expenses SET next_occurrence = ${next} WHERE id = ${template.id}
+        UPDATE recurring_expenses SET next_occurrence = ${next}, active = ${stillActive} WHERE id = ${template.id}
       `;
 
       created.push(expenseId);

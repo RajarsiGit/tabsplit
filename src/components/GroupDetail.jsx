@@ -10,6 +10,8 @@ import AddMemberForm from "./AddMemberForm.jsx";
 import BalancesSummary from "./BalancesSummary.jsx";
 import InsightsTab from "./InsightsTab.jsx";
 import ExpenseComments from "./ExpenseComments.jsx";
+import ExpenseItems from "./ExpenseItems.jsx";
+import GroupActivity from "./GroupActivity.jsx";
 
 const TABS = ["Expenses", "Recurring", "Balances", "Insights", "Members", "Settings"];
 
@@ -29,10 +31,19 @@ export default function GroupDetail() {
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("all");
   const [expenseSort, setExpenseSort] = useState("date-desc");
+  const [expenseFromDate, setExpenseFromDate] = useState("");
+  const [expenseToDate, setExpenseToDate] = useState("");
   const [expandedCommentsId, setExpandedCommentsId] = useState(null);
+  const [expandedItemsId, setExpandedItemsId] = useState(null);
+  const [duplicatingExpense, setDuplicatingExpense] = useState(null);
+  const [duplicatingLoading, setDuplicatingLoading] = useState(false);
   const [customCategories, setCustomCategories] = useState([]);
   const [newCategory, setNewCategory] = useState("");
   const [categoryBusy, setCategoryBusy] = useState(false);
+  const [budgets, setBudgets] = useState([]);
+  const [newBudgetCategory, setNewBudgetCategory] = useState("");
+  const [newBudgetAmount, setNewBudgetAmount] = useState("");
+  const [budgetBusy, setBudgetBusy] = useState(false);
 
   const [settingsName, setSettingsName] = useState("");
   const [settingsDescription, setSettingsDescription] = useState("");
@@ -61,12 +72,17 @@ export default function GroupDetail() {
     groupsApi.listCategories(id).then(setCustomCategories).catch(() => {});
   }, [id]);
 
+  const loadBudgets = useCallback(() => {
+    groupsApi.listBudgets(id).then(setBudgets).catch(() => {});
+  }, [id]);
+
   useEffect(() => {
     loadGroup();
     loadExpenses();
     loadRecurring();
     loadCategories();
-  }, [loadGroup, loadExpenses, loadRecurring, loadCategories]);
+    loadBudgets();
+  }, [loadGroup, loadExpenses, loadRecurring, loadCategories, loadBudgets]);
 
   const categories = useMemo(() => mergeCategories(customCategories), [customCategories]);
 
@@ -100,6 +116,39 @@ export default function GroupDetail() {
     }
   }
 
+  async function handleAddBudget(e) {
+    e.preventDefault();
+    setError("");
+    if (!newBudgetAmount || Number(newBudgetAmount) <= 0) return;
+    setBudgetBusy(true);
+    try {
+      await groupsApi.createBudget(id, {
+        category: newBudgetCategory.trim().toLowerCase() || undefined,
+        limitAmount: Number(newBudgetAmount),
+      });
+      setNewBudgetCategory("");
+      setNewBudgetAmount("");
+      loadBudgets();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBudgetBusy(false);
+    }
+  }
+
+  async function handleRemoveBudget(budgetId) {
+    setError("");
+    setBudgetBusy(true);
+    try {
+      await groupsApi.deleteBudget(id, budgetId);
+      loadBudgets();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBudgetBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (group) {
       setSettingsName(group.name);
@@ -119,13 +168,15 @@ export default function GroupDetail() {
     return expenses
       .filter((e) => expenseCategoryFilter === "all" || e.category === expenseCategoryFilter)
       .filter((e) => !expenseSearch || e.description.toLowerCase().includes(expenseSearch.toLowerCase()))
+      .filter((e) => !expenseFromDate || e.expense_date >= expenseFromDate)
+      .filter((e) => !expenseToDate || e.expense_date <= expenseToDate)
       .sort((a, b) => {
         if (expenseSort === "date-asc") return new Date(a.expense_date) - new Date(b.expense_date);
         if (expenseSort === "amount-desc") return Number(b.amount) - Number(a.amount);
         if (expenseSort === "amount-asc") return Number(a.amount) - Number(b.amount);
         return new Date(b.expense_date) - new Date(a.expense_date);
       });
-  }, [expenses, expenseCategoryFilter, expenseSearch, expenseSort]);
+  }, [expenses, expenseCategoryFilter, expenseSearch, expenseFromDate, expenseToDate, expenseSort]);
 
   async function handleDeleteExpense(expenseId) {
     await expensesApi.delete(expenseId);
@@ -136,6 +187,7 @@ export default function GroupDetail() {
   async function handleStartEditExpense(expenseId) {
     setError("");
     setShowExpenseForm(false);
+    setDuplicatingExpense(null);
     setEditingExpenseLoading(true);
     try {
       const full = await expensesApi.get(expenseId);
@@ -144,6 +196,21 @@ export default function GroupDetail() {
       setError(err.message);
     } finally {
       setEditingExpenseLoading(false);
+    }
+  }
+
+  async function handleStartDuplicateExpense(expenseId) {
+    setError("");
+    setShowExpenseForm(false);
+    setEditingExpense(null);
+    setDuplicatingLoading(true);
+    try {
+      const full = await expensesApi.get(expenseId);
+      setDuplicatingExpense(full);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDuplicatingLoading(false);
     }
   }
 
@@ -309,11 +376,21 @@ export default function GroupDetail() {
 
       {tab === "Expenses" && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-3">
+            {expenses.length > 0 && (
+              <a
+                href={expensesApi.exportUrl(id)}
+                download
+                className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900"
+              >
+                Export CSV
+              </a>
+            )}
             <button
               type="button"
               onClick={() => {
                 setEditingExpense(null);
+                setDuplicatingExpense(null);
                 setShowExpenseForm((v) => !v);
               }}
               className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
@@ -336,7 +413,9 @@ export default function GroupDetail() {
             />
           )}
 
-          {editingExpenseLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading expense...</p>}
+          {(editingExpenseLoading || duplicatingLoading) && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">Loading expense...</p>
+          )}
 
           {editingExpense && (
             <AddExpenseForm
@@ -350,6 +429,21 @@ export default function GroupDetail() {
                 loadGroup();
               }}
               onCancel={() => setEditingExpense(null)}
+            />
+          )}
+
+          {duplicatingExpense && (
+            <AddExpenseForm
+              groupId={id}
+              members={group.members}
+              duplicateFrom={duplicatingExpense}
+              categories={categories}
+              onAdded={() => {
+                setDuplicatingExpense(null);
+                loadExpenses();
+                loadGroup();
+              }}
+              onCancel={() => setDuplicatingExpense(null)}
             />
           )}
 
@@ -383,6 +477,20 @@ export default function GroupDetail() {
                 <option value="amount-desc">Amount: high to low</option>
                 <option value="amount-asc">Amount: low to high</option>
               </select>
+              <input
+                type="date"
+                value={expenseFromDate}
+                onChange={(e) => setExpenseFromDate(e.target.value)}
+                aria-label="From date"
+                className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+              <input
+                type="date"
+                value={expenseToDate}
+                onChange={(e) => setExpenseToDate(e.target.value)}
+                aria-label="To date"
+                className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
             </div>
           )}
 
@@ -418,8 +526,17 @@ export default function GroupDetail() {
                         )}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                       <span className="font-semibold">{formatCurrency(exp.amount, group.currency)}</span>
+                      {exp.split_type === "itemized" && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedItemsId((cur) => (cur === exp.id ? null : exp.id))}
+                          className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:underline"
+                        >
+                          {expandedItemsId === exp.id ? "Hide items" : "Items"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -428,6 +545,14 @@ export default function GroupDetail() {
                         className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:underline"
                       >
                         {expandedCommentsId === exp.id ? "Hide comments" : "Comments"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleStartDuplicateExpense(exp.id)}
+                        aria-label={`Duplicate expense ${exp.description}`}
+                        className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:underline"
+                      >
+                        Duplicate
                       </button>
                       <button
                         type="button"
@@ -447,6 +572,12 @@ export default function GroupDetail() {
                       </button>
                     </div>
                   </div>
+
+                  {expandedItemsId === exp.id && (
+                    <div className="mt-3">
+                      <ExpenseItems expenseId={exp.id} members={group.members} currency={group.currency} />
+                    </div>
+                  )}
 
                   {expandedCommentsId === exp.id && (
                     <div className="mt-3">
@@ -508,6 +639,7 @@ export default function GroupDetail() {
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {r.frequency} &middot; {r.category} &middot; paid by {r.paid_by_name} &middot; next on{" "}
                       {r.next_occurrence}
+                      {r.end_date && <> &middot; ends {r.end_date}</>}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:justify-end">
@@ -718,6 +850,75 @@ export default function GroupDetail() {
                 Add
               </button>
             </form>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h2 className="mb-1 font-semibold">Budgets</h2>
+            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+              Monthly spending limits, whole-group or per-category. Everyone is notified once a limit is exceeded.
+            </p>
+            <ul className="mb-3 space-y-1.5">
+              {budgets.length === 0 ? (
+                <li className="text-sm text-gray-400 dark:text-gray-500">No budgets set yet.</li>
+              ) : (
+                budgets.map((b) => (
+                  <li key={b.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span>
+                      {b.category ? <strong>{b.category}</strong> : <strong>Whole group</strong>}{" "}
+                      &middot; {formatCurrency(b.limit_amount, group.currency)}/month
+                    </span>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        disabled={budgetBusy}
+                        onClick={() => handleRemoveBudget(b.id)}
+                        aria-label={`Remove budget ${b.category || "whole group"}`}
+                        className="text-xs font-medium text-red-500 dark:text-red-400 hover:underline disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </li>
+                ))
+              )}
+            </ul>
+            {isOwner && (
+              <form onSubmit={handleAddBudget} className="flex flex-wrap gap-2">
+                <input
+                  value={newBudgetCategory}
+                  onChange={(e) => setNewBudgetCategory(e.target.value)}
+                  placeholder="Category (blank = whole group)"
+                  list="group-detail-budget-categories"
+                  className="min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <datalist id="group-detail-budget-categories">
+                  {categories.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={newBudgetAmount}
+                  onChange={(e) => setNewBudgetAmount(e.target.value)}
+                  placeholder="Monthly limit"
+                  className="w-32 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <button
+                  type="submit"
+                  disabled={budgetBusy || !newBudgetAmount}
+                  className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <h2 className="mb-3 font-semibold">Activity</h2>
+            <GroupActivity groupId={id} />
           </div>
 
           {isOwner && (

@@ -13,6 +13,8 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
   const [showForm, setShowForm] = useState(false);
   const [settlements, setSettlements] = useState([]);
   const [error, setError] = useState("");
+  const [quickSettleBusyIndex, setQuickSettleBusyIndex] = useState(null);
+  const [nudgedIndex, setNudgedIndex] = useState(null);
 
   const loadSettlements = useCallback(() => {
     settlementsApi
@@ -42,6 +44,31 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
       await settlementsApi.delete(settlementId);
       loadSettlements();
       onChanged();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleQuickSettle(t, index) {
+    setError("");
+    setQuickSettleBusyIndex(index);
+    try {
+      await settlementsApi.create({ groupId, fromUser: t.from, toUser: t.to, amount: t.amount });
+      loadSettlements();
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setQuickSettleBusyIndex(null);
+    }
+  }
+
+  async function handleNudge(t, index) {
+    setError("");
+    try {
+      await settlementsApi.nudge({ groupId, from: t.from, to: t.to, amount: t.amount });
+      setNudgedIndex(index);
+      setTimeout(() => setNudgedIndex((cur) => (cur === index ? null : cur)), 2000);
     } catch (err) {
       setError(err.message);
     }
@@ -92,13 +119,30 @@ export default function BalancesSummary({ groupId, members, balances, settleUp, 
                   <strong>{memberName(members, t.from)}</strong> owes{" "}
                   <strong>{memberName(members, t.to)}</strong> {formatCurrency(t.amount, currency)}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => openForm({ from: t.from, to: t.to, amount: t.amount })}
-                  className="shrink-0 text-brand-600 dark:text-brand-400 hover:underline"
-                >
-                  Settle
-                </button>
+                <span className="flex shrink-0 items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={quickSettleBusyIndex === i}
+                    onClick={() => handleQuickSettle(t, i)}
+                    className="text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
+                  >
+                    Quick settle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openForm({ from: t.from, to: t.to, amount: t.amount })}
+                    className="text-brand-600 dark:text-brand-400 hover:underline"
+                  >
+                    Settle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleNudge(t, i)}
+                    className="text-gray-500 dark:text-gray-400 hover:underline"
+                  >
+                    {nudgedIndex === i ? "Sent!" : "Remind"}
+                  </button>
+                </span>
               </li>
             ))}
           </ul>

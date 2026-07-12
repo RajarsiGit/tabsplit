@@ -27,6 +27,17 @@ export default async function handler(req, res) {
   try {
     const { id, action } = req.query;
 
+    // GET /api/groups?id=X&action=budgets - spending limits for this group
+    if (req.method === "GET" && id && action === "budgets") {
+      await requireGroupMember(sql, id, userId);
+
+      const budgets = await sql`
+        SELECT * FROM budgets WHERE group_id = ${id} ORDER BY category NULLS FIRST, created_at ASC
+      `;
+
+      return res.status(200).json(budgets);
+    }
+
     // GET /api/groups?id=X&action=categories - custom categories this group added
     if (req.method === "GET" && id && action === "categories") {
       await requireGroupMember(sql, id, userId);
@@ -126,6 +137,33 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json(groups);
+    }
+
+    // POST /api/groups?id=X&action=budgets - create or update a spending limit (owner only)
+    if (req.method === "POST" && id && action === "budgets") {
+      await requireGroupOwner(sql, id, userId);
+
+      const { category, limitAmount } = req.body;
+      if (!limitAmount || Number(limitAmount) <= 0) {
+        return res.status(400).json({ error: "limitAmount is required and must be positive" });
+      }
+      const normalizedCategory = category ? String(category).trim().toLowerCase().slice(0, 50) : null;
+
+      // A partial unique index (category IS NULL) backs the whole-group case, which a plain
+      // ON CONFLICT (group_id, category) clause can't target - upsert manually instead.
+      const existing = normalizedCategory
+        ? await sql`SELECT id FROM budgets WHERE group_id = ${id} AND category = ${normalizedCategory}`
+        : await sql`SELECT id FROM budgets WHERE group_id = ${id} AND category IS NULL`;
+
+      const result = existing.length
+        ? await sql`UPDATE budgets SET limit_amount = ${limitAmount} WHERE id = ${existing[0].id} RETURNING *`
+        : await sql`
+            INSERT INTO budgets (group_id, category, limit_amount, created_by)
+            VALUES (${id}, ${normalizedCategory}, ${limitAmount}, ${userId})
+            RETURNING *
+          `;
+
+      return res.status(201).json(result[0]);
     }
 
     // POST /api/groups?id=X&action=categories - add a custom category
@@ -247,6 +285,26 @@ export default async function handler(req, res) {
       return res.status(201).json(group);
     }
 
+    // PUT /api/groups?id=X&action=budgets - update a spending limit's amount (owner only)
+    if (req.method === "PUT" && id && action === "budgets") {
+      await requireGroupOwner(sql, id, userId);
+
+      const { budgetId, limitAmount } = req.body;
+      if (!budgetId || !limitAmount || Number(limitAmount) <= 0) {
+        return res.status(400).json({ error: "budgetId and a positive limitAmount are required" });
+      }
+
+      const result = await sql`
+        UPDATE budgets SET limit_amount = ${limitAmount} WHERE id = ${budgetId} AND group_id = ${id}
+        RETURNING *
+      `;
+      if (result.length === 0) {
+        return res.status(404).json({ error: "Budget not found" });
+      }
+
+      return res.status(200).json(result[0]);
+    }
+
     // PUT /api/groups - update name/description/currency (owner only)
     if (req.method === "PUT") {
       const { id: bodyId, name, description, currency } = req.body;
@@ -349,6 +407,20 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ message: "Member removed" });
+    }
+
+    // DELETE /api/groups?id=X&action=budgets&budgetId=Y - remove a spending limit (owner only)
+    if (req.method === "DELETE" && id && action === "budgets") {
+      await requireGroupOwner(sql, id, userId);
+
+      const { budgetId } = req.query;
+      if (!budgetId) {
+        return res.status(400).json({ error: "budgetId is required" });
+      }
+
+      await sql`DELETE FROM budgets WHERE id = ${budgetId} AND group_id = ${id}`;
+
+      return res.status(200).json({ message: "Budget removed" });
     }
 
     // DELETE /api/groups?id=X - delete a group (owner only)

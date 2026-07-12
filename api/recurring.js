@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     // POST /api/recurring - create a recurring expense template
     // Splits equally among all current group members whenever it's generated.
     if (req.method === "POST") {
-      const { groupId: bodyGroupId, description, amount, category, frequency, startDate, paidBy } = req.body;
+      const { groupId: bodyGroupId, description, amount, category, frequency, startDate, paidBy, endDate } = req.body;
 
       if (!bodyGroupId || !description || !amount || !paidBy || !startDate) {
         return res.status(400).json({
@@ -50,8 +50,8 @@ export default async function handler(req, res) {
       await requireGroupMember(sql, bodyGroupId, userId);
 
       const result = await sql`
-        INSERT INTO recurring_expenses (group_id, created_by, paid_by, description, amount, category, frequency, next_occurrence)
-        VALUES (${bodyGroupId}, ${userId}, ${paidBy}, ${description}, ${amount}, ${category || "other"}, ${frequency || "monthly"}, ${startDate})
+        INSERT INTO recurring_expenses (group_id, created_by, paid_by, description, amount, category, frequency, next_occurrence, end_date)
+        VALUES (${bodyGroupId}, ${userId}, ${paidBy}, ${description}, ${amount}, ${category || "other"}, ${frequency || "monthly"}, ${startDate}, ${endDate || null})
         RETURNING *
       `;
 
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
     // PUT /api/recurring - update a recurring template
     if (req.method === "PUT") {
-      const { id: bodyId, description, amount, category, frequency, paidBy, active } = req.body;
+      const { id: bodyId, description, amount, category, frequency, paidBy, active, endDate } = req.body;
 
       if (!bodyId) {
         return res.status(400).json({ error: "Recurring expense id is required" });
@@ -81,7 +81,8 @@ export default async function handler(req, res) {
           category = COALESCE(${category}, category),
           frequency = COALESCE(${frequency}, frequency),
           paid_by = COALESCE(${paidBy}, paid_by),
-          active = COALESCE(${active}, active)
+          active = COALESCE(${active}, active),
+          end_date = COALESCE(${endDate}, end_date)
         WHERE id = ${bodyId}
         RETURNING *
       `;

@@ -1,5 +1,6 @@
 import { getDb, requireAuth, setCors, requireGroupMember } from "./_lib/db.js";
 import { createNotification } from "./notifications.js";
+import { formatCurrency } from "./_lib/format.js";
 
 // Splits `amount` across `userIds` as evenly as possible, distributing the
 // leftover pennies (from rounding) to the first few participants.
@@ -89,6 +90,11 @@ async function writeSplits(sql, expenseId, splitType, amount, participants) {
       throw new Error("Percentages must add up to 100");
     }
     splits = splitByPercentage(amount, participants);
+  } else if (splitType === "itemized") {
+    if (!validateExactSplits(amount, participants)) {
+      throw new Error("Item amounts must add up to the total expense amount");
+    }
+    splits = participants.map((p) => ({ userId: p.userId, shareAmount: Number(p.shareAmount) }));
   } else {
     splits = splitEqually(
       amount,
@@ -106,6 +112,74 @@ async function writeSplits(sql, expenseId, splitType, amount, participants) {
   }
 
   return splits;
+}
+
+// Aggregates each item's own equal split across its participants into one
+// total per user across all items - this is what feeds writeSplits, not a
+// second source of truth for balances.
+export function aggregateItemizedSplits(items) {
+  const totals = {};
+  for (const item of items) {
+    const shares = splitEqually(Number(item.amount), item.participantIds);
+    for (const s of shares) {
+      totals[s.userId] = (totals[s.userId] || 0) + s.shareAmount;
+    }
+  }
+  return Object.entries(totals).map(([userId, shareAmount]) => ({
+    userId: Number(userId),
+    shareAmount: Math.round(shareAmount * 100) / 100,
+  }));
+}
+
+async function writeItems(sql, expenseId, items) {
+  await sql`DELETE FROM expense_items WHERE expense_id = ${expenseId}`;
+
+  for (const item of items) {
+    const [row] = await sql`
+      INSERT INTO expense_items (expense_id, description, amount)
+      VALUES (${expenseId}, ${item.description}, ${item.amount})
+      RETURNING id
+    `;
+    for (const participantId of item.participantIds) {
+      await sql`
+        INSERT INTO expense_item_participants (item_id, user_id)
+        VALUES (${row.id}, ${participantId})
+      `;
+    }
+  }
+}
+
+// Notifies the group once a budget (whole-group or per-category) is exceeded
+// for the current calendar month, debounced via last_notified_at so it only
+// fires once per month per budget. Failures here must never block the
+// expense write itself - callers wrap this in try/catch.
+async function checkBudgetsAndNotify(sql, groupId, category) {
+  const budgets = await sql`
+    SELECT * FROM budgets WHERE group_id = ${groupId} AND (category IS NULL OR category = ${category})
+  `;
+  if (budgets.length === 0) return;
+
+  const [group] = await sql`SELECT name, currency FROM groups WHERE id = ${groupId}`;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const monthStartStr = monthStart.toISOString().slice(0, 10);
+
+  for (const budget of budgets) {
+    if (budget.last_notified_at && new Date(budget.last_notified_at) >= monthStart) continue;
+
+    const totalRows = budget.category
+      ? await sql`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE group_id = ${groupId} AND category = ${budget.category} AND expense_date >= ${monthStartStr}`
+      : await sql`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE group_id = ${groupId} AND expense_date >= ${monthStartStr}`;
+    const total = Number(totalRows[0].total);
+    if (total <= Number(budget.limit_amount)) continue;
+
+    const members = await sql`SELECT user_id FROM group_members WHERE group_id = ${groupId}`;
+    const message = `${group.name}'s ${budget.category ? `"${budget.category}" ` : ""}budget of ${formatCurrency(budget.limit_amount, group.currency)} was exceeded this month (${formatCurrency(total, group.currency)} spent)`;
+    for (const member of members) {
+      await createNotification(sql, { userId: member.user_id, groupId, type: "budget_exceeded", message });
+    }
+    await sql`UPDATE budgets SET last_notified_at = CURRENT_TIMESTAMP WHERE id = ${budget.id}`;
+  }
 }
 
 export default async function handler(req, res) {
@@ -202,6 +276,27 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: "Comment removed" });
     }
 
+    // GET /api/expenses?id=X&action=items - line items for an itemized-split expense
+    if (req.method === "GET" && id && action === "items") {
+      const expenses = await sql`SELECT group_id FROM expenses WHERE id = ${id}`;
+      if (expenses.length === 0) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      await requireGroupMember(sql, expenses[0].group_id, userId);
+
+      const items = await sql`
+        SELECT ei.id, ei.description, ei.amount,
+          COALESCE(json_agg(eip.user_id) FILTER (WHERE eip.user_id IS NOT NULL), '[]') AS participant_ids
+        FROM expense_items ei
+        LEFT JOIN expense_item_participants eip ON eip.item_id = ei.id
+        WHERE ei.expense_id = ${id}
+        GROUP BY ei.id
+        ORDER BY ei.id ASC
+      `;
+
+      return res.status(200).json(items);
+    }
+
     // GET /api/expenses?id=X - single expense with splits
     if (req.method === "GET" && id) {
       const expenses = await sql`SELECT * FROM expenses WHERE id = ${id}`;
@@ -226,6 +321,27 @@ export default async function handler(req, res) {
       `;
 
       return res.status(200).json({ ...expenses[0], splits, payments });
+    }
+
+    // GET /api/expenses?groupId=X&action=export - CSV download of a group's expenses
+    if (req.method === "GET" && groupId && action === "export") {
+      await requireGroupMember(sql, groupId, userId);
+
+      const rows = await sql`
+        SELECT description, amount, category, expense_date, split_type
+        FROM expenses WHERE group_id = ${groupId}
+        ORDER BY expense_date DESC
+      `;
+
+      const csvEscape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+      const header = "description,amount,category,date,split_type";
+      const body = rows
+        .map((r) => [r.description, r.amount, r.category, r.expense_date, r.split_type].map(csvEscape).join(","))
+        .join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="tabsplit-group-${groupId}-expenses.csv"`);
+      return res.status(200).send(`${header}\n${body}`);
     }
 
     // GET /api/expenses?groupId=X - list expenses for a group
@@ -261,13 +377,23 @@ export default async function handler(req, res) {
         payments,
         participants,
         receiptUrl,
+        originalAmount,
+        originalCurrency,
+        items,
       } = req.body;
 
       const paymentsList = normalizePayments(amount, paidBy, payments);
+      const isItemized = splitType === "itemized";
 
-      if (!bodyGroupId || !description || !amount || !paymentsList.length || !participants?.length) {
+      if (
+        !bodyGroupId ||
+        !description ||
+        !amount ||
+        !paymentsList.length ||
+        (isItemized ? !items?.length : !participants?.length)
+      ) {
         return res.status(400).json({
-          error: "groupId, description, amount, paidBy (or payments), and participants are required",
+          error: "groupId, description, amount, paidBy (or payments), and participants (or items) are required",
         });
       }
 
@@ -276,14 +402,18 @@ export default async function handler(req, res) {
       const singlePayer = paymentsList.length === 1 ? paymentsList[0].userId : null;
 
       const result = await sql`
-        INSERT INTO expenses (group_id, paid_by, created_by, description, amount, category, split_type, expense_date, receipt_url)
-        VALUES (${bodyGroupId}, ${singlePayer}, ${userId}, ${description}, ${amount}, ${category || "other"}, ${splitType || "equal"}, ${expenseDate || new Date().toISOString().slice(0, 10)}, ${receiptUrl || null})
+        INSERT INTO expenses (group_id, paid_by, created_by, description, amount, category, split_type, expense_date, receipt_url, original_amount, original_currency)
+        VALUES (${bodyGroupId}, ${singlePayer}, ${userId}, ${description}, ${amount}, ${category || "other"}, ${splitType || "equal"}, ${expenseDate || new Date().toISOString().slice(0, 10)}, ${receiptUrl || null}, ${originalAmount || null}, ${originalCurrency || null})
         RETURNING *
       `;
 
       const expense = result[0];
       const writtenPayments = await writePayments(sql, expense.id, Number(amount), paymentsList);
-      const splits = await writeSplits(sql, expense.id, splitType, Number(amount), participants);
+      const finalParticipants = isItemized ? aggregateItemizedSplits(items) : participants;
+      const splits = await writeSplits(sql, expense.id, splitType, Number(amount), finalParticipants);
+      if (isItemized) {
+        await writeItems(sql, expense.id, items);
+      }
 
       const [creator, otherMembers] = await Promise.all([
         sql`SELECT name FROM users WHERE id = ${userId}`,
@@ -298,12 +428,32 @@ export default async function handler(req, res) {
         });
       }
 
+      try {
+        await checkBudgetsAndNotify(sql, bodyGroupId, expense.category);
+      } catch {
+        // Budget check is a side effect - never block expense creation on it.
+      }
+
       return res.status(201).json({ ...expense, splits, payments: writtenPayments });
     }
 
     // PUT /api/expenses - update an expense
     if (req.method === "PUT") {
-      const { id: bodyId, description, amount, category, splitType, expenseDate, paidBy, payments, participants, receiptUrl } = req.body;
+      const {
+        id: bodyId,
+        description,
+        amount,
+        category,
+        splitType,
+        expenseDate,
+        paidBy,
+        payments,
+        participants,
+        receiptUrl,
+        originalAmount,
+        originalCurrency,
+        items,
+      } = req.body;
 
       if (!bodyId) {
         return res.status(400).json({ error: "Expense id is required" });
@@ -333,6 +483,8 @@ export default async function handler(req, res) {
           split_type = COALESCE(${splitType}, split_type),
           expense_date = COALESCE(${expenseDate}, expense_date),
           receipt_url = COALESCE(${receiptUrl}, receipt_url),
+          original_amount = COALESCE(${originalAmount}, original_amount),
+          original_currency = COALESCE(${originalCurrency}, original_currency),
           paid_by = ${singlePayer}
         WHERE id = ${bodyId}
         RETURNING *
@@ -348,10 +500,21 @@ export default async function handler(req, res) {
       }
 
       let splits;
-      if (participants?.length) {
+      const isItemized = expense.split_type === "itemized";
+      if (isItemized && items?.length) {
+        const finalParticipants = aggregateItemizedSplits(items);
+        splits = await writeSplits(sql, expense.id, expense.split_type, Number(expense.amount), finalParticipants);
+        await writeItems(sql, expense.id, items);
+      } else if (participants?.length) {
         splits = await writeSplits(sql, expense.id, expense.split_type, Number(expense.amount), participants);
       } else {
         splits = await sql`SELECT user_id, share_amount FROM expense_splits WHERE expense_id = ${expense.id}`;
+      }
+
+      try {
+        await checkBudgetsAndNotify(sql, expense.group_id, expense.category);
+      } catch {
+        // Budget check is a side effect - never block expense updates on it.
       }
 
       return res.status(200).json({ ...expense, splits, payments: writtenPayments });

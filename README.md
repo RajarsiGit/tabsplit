@@ -13,6 +13,8 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Owners can promote another member to owner or demote a co-owner back to member — the last remaining owner can't be demoted or removed until someone else is promoted
   - **Archive** a group to hide it from your default groups list without deleting anything — unarchive any time (owner-only); a "Show archived groups" toggle on the dashboard reveals them again
   - Add **custom categories** on top of the built-in defaults, scoped to that group, from its Settings tab (any member can add one; owners can remove them)
+  - Set a **monthly budget** — for the whole group or per-category — from its Settings tab (owner-only to add/remove, visible to everyone); everyone in the group gets notified once a budget's month-to-date spend goes over the limit
+  - A per-group **Activity** feed on the Settings tab shows that group's recent notification-worthy events in one shared view
 
 - **Deleting things**
   - Any group member can delete an individual expense, recurring template, or settlement
@@ -21,12 +23,15 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 - **Expenses**
   - Log one-off expenses with description, amount, category, and date
   - **Edit an existing expense** — the same form used to add one, prefilled, including its split and payer setup
-  - Split **equally**, enter **exact** custom amounts per person, or split by **percentage** (per-person `%` inputs, validated to add up to 100)
+  - **Duplicate an existing expense** — prefills a fresh "Add expense" form from it (dated today), for near-identical repeat purchases that don't fit a recurring template's fixed cadence
+  - Split **equally**, enter **exact** custom amounts per person, split by **percentage** (per-person `%` inputs, validated to add up to 100), or split **itemized** — break a receipt into individual line items, each with its own subset of participants, and let TabSplit total up who owes what
   - Rounding remainders are distributed automatically so splits always add up to the penny
   - **Split the payment itself** across more than one payer (e.g. two roommates who split fronting the cost of one grocery run) instead of a single "paid by"
+  - Tag an expense as **paid in a different currency** — record the original foreign amount/currency alongside the group-currency amount, purely for your own reference (the group-currency amount is always what's actually split and balanced)
   - Attach a **receipt photo** to an expense (uploaded directly to Vercel Blob storage)
   - **Comment** on an expense — any group member can post one, and only the author can remove their own
-  - Search, filter by category, and sort a group's expense list (by date or amount); a sidebar **All Expenses** page does the same across every group you're in, with an added "paid by me" filter and a per-currency total
+  - Search, filter by category and date range, and sort a group's expense list (by date or amount); a sidebar **All Expenses** page does the same across every group you're in, with an added "paid by me" filter and a per-currency total
+  - **Export a group's expenses as CSV** from its Expenses tab
 
 - **Invite links**
   - Group owners can generate a shareable invite link from the group's Settings tab
@@ -35,7 +40,7 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
 
 - **Notifications**
   - In-app notification bell in the sidebar, plus a full **Activity** page for browsing further back — no email required
-  - Notified when you're added to a group, your role changes, a new expense or comment is logged, someone records a settlement with you, or you have an outstanding balance a weekly reminder job flags
+  - Notified when you're added to a group, your role changes, a new expense or comment is logged, someone records a settlement with you or nudges you about one you owe, a group's budget is exceeded for the month, or you have an outstanding balance a weekly reminder job flags
   - Unread badge count, mark one or all as read
 
 - **Insights**
@@ -47,12 +52,14 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - A daily scheduled job materializes each due template into a real expense and advances it to the next occurrence
   - Always split equally across whoever is currently in the group — no need to remember a fixed participant list
   - **Pause or resume** a template without deleting it — paused templates are skipped by the daily job
+  - Optionally set an **end date** — the daily job automatically pauses the template once its next occurrence would fall after it, no need to remember to cancel it yourself
   - A sidebar **Recurring** page lists upcoming (and, optionally, paused) templates across every group
 
 - **Balances & settling up**
   - See each member's live balance (owed vs. owes) for a group
   - Automatic debt simplification suggests the minimum set of payments needed to settle everyone up
-  - Record a manual payment ("I paid you back $20") to clear a debt, with an optional note
+  - Record a manual payment ("I paid you back $20") to clear a debt, with an optional note, or **quick settle** a suggested payment in one click with no form
+  - **Remind** a specific person about a suggested payment with a one-off nudge notification, separate from the weekly automatic reminder
   - A sidebar **Settle Up** page surfaces every group's outstanding suggestions in one place
   - A weekly scheduled job reminds anyone with an outstanding balance who they owe and how much
 
@@ -166,16 +173,25 @@ Open a group → **Expenses** tab → **Add expense**. Choose who paid, the amou
 - **Equally** — pick which members are in on the expense; the amount is divided evenly
 - **Exact amounts** — enter each participant's share directly (must add up to the total)
 - **Percentages** — enter each participant's share as a `%`; the running total must add up to 100
+- **Itemized** — break the expense into individual line items (e.g. each thing on a grocery receipt), pick which participants are in on each one, and TabSplit totals up everyone's share; item amounts must add up to the expense total
 
-Check **Split the payment too** if more than one person fronted the money — pick each payer and how much they paid (must add up to the total). Optionally attach a receipt photo. Once added, click **Edit** on any expense to reopen the same form prefilled, or **Comments** to discuss it with the group.
+Check **Split the payment too** if more than one person fronted the money — pick each payer and how much they paid (must add up to the total). Check **This was paid in a different currency** to tag the original foreign amount/currency alongside the group-currency amount, for your own reference (it's display-only — the group-currency amount is still what actually gets split and balanced). Optionally attach a receipt photo. Once added, click **Edit** on any expense to reopen the same form prefilled, **Duplicate** to prefill a new expense from it (dated today, for a quick repeat purchase), **Items** (itemized expenses only) to see its line-item breakdown, or **Comments** to discuss it with the group.
 
 ### Custom categories
 
 Open a group → **Settings** tab → **Categories**. Any member can add a category name specific to that group; it shows up alongside the built-in defaults in that group's expense/recurring forms and filters. Owners can remove one.
 
+### Setting a budget
+
+Open a group → **Settings** tab → **Budgets** (owner-only to add/remove; visible to everyone). Leave the category field blank for a whole-group monthly limit, or enter a category name to scope it to just that category. Once that month's spend crosses the limit, every group member gets a one-time notification for that month.
+
 ### Browsing across groups
 
-The sidebar's **All Expenses**, **Settle Up**, and **Recurring** pages each aggregate that resource across every group you're in — useful for a quick "what do I owe overall" or "what's coming up" check without opening groups one at a time. **Activity** is the full notification history behind the bell icon.
+The sidebar's **All Expenses**, **Settle Up**, and **Recurring** pages each aggregate that resource across every group you're in — useful for a quick "what do I owe overall" or "what's coming up" check without opening groups one at a time, and **All Expenses** can also be filtered to a date range. The sidebar's **Activity** is your full personal notification history behind the bell icon; a group's own **Settings → Activity** section is a separate, shared feed of that one group's recent events, visible to every member.
+
+### Exporting a group's expenses
+
+Open a group → **Expenses** tab → **Export CSV** downloads that group's expenses as a spreadsheet. This is separate from the account-wide JSON export below.
 
 ### Inviting people via link
 
@@ -183,11 +199,11 @@ Open a group → **Settings** tab → **Invite link** (owner-only). Click **Gene
 
 ### Setting up a recurring expense
 
-Open a group → **Recurring** tab → **Add recurring expense**. Choose an amount, category, frequency (weekly/monthly), and start date. Each time it's due, TabSplit generates a real expense split equally across the group's current members and schedules the next occurrence. **Pause** a template to stop it generating without deleting it; **Resume** to pick back up.
+Open a group → **Recurring** tab → **Add recurring expense**. Choose an amount, category, frequency (weekly/monthly), start date, and optionally an end date. Each time it's due, TabSplit generates a real expense split equally across the group's current members and schedules the next occurrence — once that next occurrence would land after the end date (if you set one), the template automatically pauses itself. **Pause** a template to stop it generating without deleting it at any time; **Resume** to pick back up.
 
 ### Settling up
 
-Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion (or **Record a payment** for an arbitrary amount) to log that someone paid someone back. The same tab lists settlement history with a **Remove** option per entry. If a balance goes unpaid, expect a weekly reminder notification.
+Open a group → **Balances** tab to see who owes whom, plus a simplified list of suggested payments. Click **Settle** on a suggestion to open the payment form pre-filled, **Quick settle** to log it instantly with no form, **Remind** to send that person a one-off nudge about it, or **Record a payment** for an arbitrary amount. The same tab lists settlement history with a **Remove** option per entry. If a balance goes unpaid, expect a weekly reminder notification too.
 
 ### Managing roles, archiving, and deleting a group
 
@@ -237,16 +253,18 @@ src/
 │   ├── NotificationsBell.jsx     # Notification badge + dropdown, polls every 30s
 │   ├── GroupsList.jsx            # Dashboard - stats, list/create/archive/delete groups
 │   ├── Dashboard.jsx             # Net balance, total spent, spend-over-time chart, spend-by-category, balance-by-group
-│   ├── AllExpenses.jsx           # Cross-group expense list with search/category/payer filters
+│   ├── AllExpenses.jsx           # Cross-group expense list with search/category/payer/date-range filters
 │   ├── SettleUp.jsx              # Cross-group settle-up suggestions
 │   ├── AllRecurring.jsx          # Cross-group upcoming (and paused) recurring templates
 │   ├── Activity.jsx              # Full notification history
 │   ├── GroupDetail.jsx           # Tabbed group view (Expenses/Recurring/Balances/Insights/Members/Settings)
-│   ├── AddExpenseForm.jsx        # Add or edit an expense - equal/exact/percentage split, multi-payer, receipt upload
+│   ├── AddExpenseForm.jsx        # Add, edit, or duplicate an expense - equal/exact/percentage/itemized split, multi-payer, multi-currency tag, receipt upload
 │   ├── ExpenseComments.jsx       # Comment thread for one expense, used inline in GroupDetail
-│   ├── AddRecurringForm.jsx      # Recurring expense template form
+│   ├── ExpenseItems.jsx          # Read-only line-item breakdown for an itemized expense, used inline in GroupDetail
+│   ├── GroupActivity.jsx         # Per-group shared activity feed, used inline in GroupDetail's Settings tab
+│   ├── AddRecurringForm.jsx      # Recurring expense template form (incl. optional end date)
 │   ├── AddMemberForm.jsx         # Add member by email
-│   ├── BalancesSummary.jsx       # Balances + settle-up suggestions + settlement history
+│   ├── BalancesSummary.jsx       # Balances + settle-up suggestions (Settle/Quick settle/Remind) + settlement history
 │   ├── SettleUpForm.jsx          # Record a manual settlement
 │   ├── InsightsTab.jsx           # Spend-by-category / paid-by-member bar charts
 │   ├── charts/
@@ -273,16 +291,16 @@ api/
 │   ├── recurrence.js             # next-occurrence date math
 │   └── format.js                 # formatCurrency (backend mirror of the frontend helper)
 ├── auth.js                       # register/login/logout/me + GitHub OAuth (github, github/callback)
-├── groups.js                     # Group CRUD + membership + roles + balances/settleUp + archive + categories
-├── expenses.js                   # Expense CRUD + split (equal/exact/percentage) + multi-payer + receipts + comments
-├── recurring.js                  # Recurring expense template CRUD (incl. active/pause toggle)
-├── settlements.js                # Record/undo manual settlements
+├── groups.js                     # Group CRUD + membership + roles + balances/settleUp + archive + categories + budgets
+├── expenses.js                   # Expense CRUD + split (equal/exact/percentage/itemized) + multi-payer + multi-currency tag + receipts + comments + CSV export
+├── recurring.js                  # Recurring expense template CRUD (incl. active/pause toggle, optional end date)
+├── settlements.js                # Record/undo manual settlements + one-off settle-up nudge
 ├── account.js                    # Account deletion (associated vs. own-records modes)
 ├── invites.js                    # Group invite link generate/revoke/preview/accept
-├── notifications.js              # In-app notifications - list (?limit=), mark read, createNotification()
+├── notifications.js              # In-app notifications - list (?limit=), mark read, createNotification(), per-group activity feed (?scope=group)
 ├── blob-upload.js                # Vercel Blob client-upload handler for receipts
 └── cron/
-    ├── process-recurring.js      # Daily job: materializes due recurring expenses
+    ├── process-recurring.js      # Daily job: materializes due recurring expenses, auto-pauses templates past their end date
     └── settle-up-reminders.js    # Weekly job: notifies anyone with an outstanding balance
 schema/
 └── schema.sql                    # Complete database schema

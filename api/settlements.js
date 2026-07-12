@@ -1,5 +1,6 @@
 import { getDb, requireAuth, setCors, requireGroupMember } from "./_lib/db.js";
 import { createNotification } from "./notifications.js";
+import { formatCurrency } from "./_lib/format.js";
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -20,7 +21,34 @@ export default async function handler(req, res) {
   const userId = auth.userId;
 
   try {
-    const { id, groupId } = req.query;
+    const { id, groupId, action } = req.query;
+
+    // POST /api/settlements?action=nudge - remind a member they owe a settle-up suggestion
+    if (req.method === "POST" && action === "nudge") {
+      const { groupId: bodyGroupId, from, to, amount } = req.body;
+
+      if (!bodyGroupId || !from || !to || !amount) {
+        return res.status(400).json({ error: "groupId, from, to, and amount are required" });
+      }
+
+      await requireGroupMember(sql, bodyGroupId, userId);
+      await requireGroupMember(sql, bodyGroupId, from);
+      await requireGroupMember(sql, bodyGroupId, to);
+
+      const [group, creditor] = await Promise.all([
+        sql`SELECT name, currency FROM groups WHERE id = ${bodyGroupId}`,
+        sql`SELECT name FROM users WHERE id = ${to}`,
+      ]);
+
+      await createNotification(sql, {
+        userId: from,
+        groupId: bodyGroupId,
+        type: "settle_up_nudge",
+        message: `Reminder: you owe ${creditor[0].name} ${formatCurrency(amount, group[0].currency)} in ${group[0].name}`,
+      });
+
+      return res.status(200).json({ message: "Reminder sent" });
+    }
 
     // GET /api/settlements?groupId=X - list settlements for a group
     if (req.method === "GET" && groupId) {

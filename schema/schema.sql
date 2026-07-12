@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS recurring_expenses (
   split_type VARCHAR(20) NOT NULL DEFAULT 'equal',
   frequency VARCHAR(20) NOT NULL DEFAULT 'monthly', -- weekly | monthly
   next_occurrence DATE NOT NULL,
+  end_date DATE, -- nullable; the cron job auto-deactivates a template once its next occurrence would fall after it
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +66,11 @@ CREATE TABLE IF NOT EXISTS expenses (
   split_type VARCHAR(20) NOT NULL DEFAULT 'equal',
   expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
   receipt_url TEXT,
+  -- original_amount/original_currency are purely informational (e.g. "$50 USD" tagged on an
+  -- expense entered in the group's own currency) - amount stays the single group-currency
+  -- value all splits/payments/balances key off.
+  original_amount NUMERIC(12, 2),
+  original_currency VARCHAR(3),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -92,6 +98,29 @@ CREATE TABLE IF NOT EXISTS expense_payments (
 
 CREATE INDEX IF NOT EXISTS idx_expense_payments_expense_id ON expense_payments(expense_id);
 CREATE INDEX IF NOT EXISTS idx_expense_payments_user_id ON expense_payments(user_id);
+
+-- Line items for an itemized-split expense (e.g. splitting a grocery receipt
+-- item by item). Each item's participants are aggregated server-side into the
+-- expense's expense_splits rows - these tables are the itemized breakdown that
+-- produced that aggregate, not a second source of truth for balances.
+CREATE TABLE IF NOT EXISTS expense_items (
+  id SERIAL PRIMARY KEY,
+  expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  description VARCHAR(255) NOT NULL,
+  amount NUMERIC(12, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_items_expense_id ON expense_items(expense_id);
+
+CREATE TABLE IF NOT EXISTS expense_item_participants (
+  id SERIAL PRIMARY KEY,
+  item_id INTEGER NOT NULL REFERENCES expense_items(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE (item_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_expense_item_participants_item_id ON expense_item_participants(item_id);
 
 -- Comments on an expense (discussion/disputes) - any group member can post one
 CREATE TABLE IF NOT EXISTS expense_comments (
@@ -126,6 +155,27 @@ CREATE TABLE IF NOT EXISTS group_invites (
 );
 
 CREATE INDEX IF NOT EXISTS idx_group_invites_token ON group_invites(token);
+
+-- Spending limits, whole-group (category IS NULL) or per-category. last_notified_at
+-- debounces the budget_exceeded notification to once per calendar month.
+CREATE TABLE IF NOT EXISTS budgets (
+  id SERIAL PRIMARY KEY,
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  category VARCHAR(50),
+  limit_amount NUMERIC(12, 2) NOT NULL,
+  period VARCHAR(20) NOT NULL DEFAULT 'monthly',
+  last_notified_at TIMESTAMP,
+  created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (group_id, category)
+);
+
+-- UNIQUE(group_id, category) doesn't stop multiple whole-group (NULL category)
+-- rows, since Postgres treats NULLs as distinct - this partial index enforces
+-- "at most one whole-group budget per group" instead.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_budgets_group_total ON budgets(group_id) WHERE category IS NULL;
+CREATE INDEX IF NOT EXISTS idx_budgets_group_id ON budgets(group_id);
 
 -- In-app notifications
 CREATE TABLE IF NOT EXISTS notifications (
@@ -171,14 +221,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+CREATE OR REPLACE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_groups_updated_at BEFORE UPDATE ON groups
+CREATE OR REPLACE TRIGGER update_groups_updated_at BEFORE UPDATE ON groups
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_recurring_expenses_updated_at BEFORE UPDATE ON recurring_expenses
+CREATE OR REPLACE TRIGGER update_recurring_expenses_updated_at BEFORE UPDATE ON recurring_expenses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
+CREATE OR REPLACE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER update_budgets_updated_at BEFORE UPDATE ON budgets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

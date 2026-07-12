@@ -9,6 +9,7 @@ export default function AddRecurringForm({ groupId, members, categories = CATEGO
   const [category, setCategory] = useState(categories[0]);
   const [frequency, setFrequency] = useState("monthly");
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState("");
   const [paidBy, setPaidBy] = useState(members[0]?.id ?? "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +26,7 @@ export default function AddRecurringForm({ groupId, members, categories = CATEGO
         category,
         frequency,
         startDate,
+        endDate: endDate || undefined,
         paidBy: Number(paidBy),
       });
       onAdded();
@@ -97,6 +99,20 @@ export default function AddRecurringForm({ groupId, members, categories = CATEGO
             required
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="recurring-end" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Ends on (optional)
+          </label>
+          <input
+            id="recurring-end"
+            type="date"
+            value={endDate}
+            min={startDate}
+            onChange={(e) => setEndDate(e.target.value)}
             className="w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </div>

@@ -15,6 +15,8 @@ export default function AllExpenses() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [payerFilter, setPayerFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -42,8 +44,10 @@ export default function AllExpenses() {
       .filter((e) => categoryFilter === "all" || e.category === categoryFilter)
       .filter((e) => payerFilter === "all" || (e.payments || []).some((p) => String(p.userId) === String(user.id)))
       .filter((e) => !search || e.description.toLowerCase().includes(search.toLowerCase()))
+      .filter((e) => !fromDate || e.expense_date >= fromDate)
+      .filter((e) => !toDate || e.expense_date <= toDate)
       .sort((a, b) => new Date(b.expense_date) - new Date(a.expense_date));
-  }, [expenses, groupFilter, categoryFilter, payerFilter, search, user.id]);
+  }, [expenses, groupFilter, categoryFilter, payerFilter, search, fromDate, toDate, user.id]);
 
   const totalsByCurrency = useMemo(() => {
     const totals = {};
@@ -103,6 +107,20 @@ export default function AllExpenses() {
           <option value="all">Paid by anyone</option>
           <option value="me">Paid by me</option>
         </select>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          aria-label="From date"
+          className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          aria-label="To date"
+          className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
       </div>
 
       {!loading && filtered.length > 0 && (
