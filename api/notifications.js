@@ -2,10 +2,14 @@ import { getDb, requireAuth, setCors, requireGroupMember } from "./_lib/db.js";
 
 // Reusable by other handlers (groups.js, expenses.js, settlements.js) to push a
 // notification without going through HTTP.
-export async function createNotification(sql, { userId, groupId, type, message }) {
+// `read: true` pre-marks a self-logged audit entry as read at insert time, so an
+// actor's own action doesn't inflate their unread bell badge/count - it still shows
+// up in the Activity history, just not as something demanding attention.
+export async function createNotification(sql, { userId, groupId, type, message, read = false }) {
+  const readAt = read ? new Date().toISOString() : null;
   await sql`
-    INSERT INTO notifications (user_id, group_id, type, message)
-    VALUES (${userId}, ${groupId ?? null}, ${type}, ${message})
+    INSERT INTO notifications (user_id, group_id, type, message, read_at)
+    VALUES (${userId}, ${groupId ?? null}, ${type}, ${message}, ${readAt})
   `;
 }
 

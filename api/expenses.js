@@ -253,6 +253,13 @@ export default async function handler(req, res) {
           message: `${commenter[0].name} commented on "${expenses[0].description}"`,
         });
       }
+      await createNotification(sql, {
+        userId,
+        groupId: expenses[0].group_id,
+        type: "expense_comment",
+        message: `${commenter[0].name} commented on "${expenses[0].description}"`,
+        read: true,
+      });
 
       return res.status(201).json({ ...result[0], user_name: commenter[0].name });
     }
@@ -271,7 +278,18 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: "You can only remove your own comments" });
       }
 
+      const expenseForNotify = await sql`SELECT group_id, description FROM expenses WHERE id = ${id}`;
+
       await sql`DELETE FROM expense_comments WHERE id = ${commentId}`;
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: expenseForNotify[0].group_id,
+        type: "comment_removed",
+        message: `${actor[0].name} removed a comment on "${expenseForNotify[0].description}"`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Comment removed" });
     }
@@ -427,6 +445,13 @@ export default async function handler(req, res) {
           message: `${creator[0].name} added a new expense: ${description}`,
         });
       }
+      await createNotification(sql, {
+        userId,
+        groupId: bodyGroupId,
+        type: "expense_added",
+        message: `${creator[0].name} added a new expense: ${description}`,
+        read: true,
+      });
 
       try {
         await checkBudgetsAndNotify(sql, bodyGroupId, expense.category);
@@ -517,6 +542,15 @@ export default async function handler(req, res) {
         // Budget check is a side effect - never block expense updates on it.
       }
 
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: expense.group_id,
+        type: "expense_updated",
+        message: `${actor[0].name} updated the expense: ${expense.description}`,
+        read: true,
+      });
+
       return res.status(200).json({ ...expense, splits, payments: writtenPayments });
     }
 
@@ -530,6 +564,15 @@ export default async function handler(req, res) {
       await requireGroupMember(sql, existing[0].group_id, userId);
 
       await sql`DELETE FROM expenses WHERE id = ${id}`;
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: existing[0].group_id,
+        type: "expense_deleted",
+        message: `${actor[0].name} deleted the expense: ${existing[0].description}`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Expense deleted", id: Number(id) });
     }

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { getDb, requireAuth, setCors, requireGroupOwner } from "./_lib/db.js";
+import { createNotification } from "./notifications.js";
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -56,6 +57,15 @@ export default async function handler(req, res) {
           INSERT INTO group_members (group_id, user_id, role)
           VALUES (${targetGroupId}, ${userId}, 'member')
         `;
+
+        const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+        await createNotification(sql, {
+          userId,
+          groupId: targetGroupId,
+          type: "group_joined",
+          message: `${actor[0].name} joined the group via invite link`,
+          read: true,
+        });
       }
 
       return res.status(200).json({ groupId: targetGroupId });
@@ -82,6 +92,15 @@ export default async function handler(req, res) {
         RETURNING token
       `;
 
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId,
+        type: "invite_generated",
+        message: `${actor[0].name} generated a new invite link`,
+        read: true,
+      });
+
       return res.status(201).json({ token: result[0].token });
     }
 
@@ -90,6 +109,15 @@ export default async function handler(req, res) {
       await requireGroupOwner(sql, groupId, userId);
 
       await sql`DELETE FROM group_invites WHERE group_id = ${groupId}`;
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId,
+        type: "invite_revoked",
+        message: `${actor[0].name} revoked the invite link`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Invite link revoked" });
     }

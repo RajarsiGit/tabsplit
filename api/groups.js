@@ -155,13 +155,24 @@ export default async function handler(req, res) {
         ? await sql`SELECT id FROM budgets WHERE group_id = ${id} AND category = ${normalizedCategory}`
         : await sql`SELECT id FROM budgets WHERE group_id = ${id} AND category IS NULL`;
 
-      const result = existing.length
+      const isUpdate = existing.length > 0;
+      const result = isUpdate
         ? await sql`UPDATE budgets SET limit_amount = ${limitAmount} WHERE id = ${existing[0].id} RETURNING *`
         : await sql`
             INSERT INTO budgets (group_id, category, limit_amount, created_by)
             VALUES (${id}, ${normalizedCategory}, ${limitAmount}, ${userId})
             RETURNING *
           `;
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      const budgetLabel = normalizedCategory ? `"${normalizedCategory}"` : "whole-group";
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: isUpdate ? "budget_updated" : "budget_created",
+        message: `${actor[0].name} ${isUpdate ? "updated the" : "set a"} ${budgetLabel} budget to ${limitAmount}`,
+        read: true,
+      });
 
       return res.status(201).json(result[0]);
     }
@@ -183,6 +194,15 @@ export default async function handler(req, res) {
         ON CONFLICT (group_id, name) DO NOTHING
       `;
 
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "category_added",
+        message: `${actor[0].name} added the "${normalized}" category`,
+        read: true,
+      });
+
       return res.status(201).json({ name: normalized });
     }
 
@@ -196,6 +216,15 @@ export default async function handler(req, res) {
       }
 
       await sql`DELETE FROM group_categories WHERE group_id = ${id} AND name = ${name}`;
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "category_removed",
+        message: `${actor[0].name} removed the "${name}" category`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Category removed" });
     }
@@ -228,12 +257,22 @@ export default async function handler(req, res) {
         VALUES (${id}, ${newMember.id}, 'member')
       `;
 
-      const groupForNotify = await sql`SELECT name FROM groups WHERE id = ${id}`;
+      const [groupForNotify, actor] = await Promise.all([
+        sql`SELECT name FROM groups WHERE id = ${id}`,
+        sql`SELECT name FROM users WHERE id = ${userId}`,
+      ]);
       await createNotification(sql, {
         userId: newMember.id,
         groupId: id,
         type: "group_added",
         message: `You were added to "${groupForNotify[0].name}"`,
+      });
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "member_added",
+        message: `${actor[0].name} added ${newMember.name} to the group`,
+        read: true,
       });
 
       return res.status(201).json(newMember);
@@ -253,6 +292,15 @@ export default async function handler(req, res) {
       if (result.length === 0) {
         return res.status(404).json({ error: "Group not found" });
       }
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: archived === false ? "group_unarchived" : "group_archived",
+        message: `${actor[0].name} ${archived === false ? "unarchived" : "archived"} the group`,
+        read: true,
+      });
 
       return res.status(200).json(result[0]);
     }
@@ -282,6 +330,14 @@ export default async function handler(req, res) {
         VALUES (${group.id}, ${userId}, 'owner')
       `;
 
+      await createNotification(sql, {
+        userId,
+        groupId: group.id,
+        type: "group_created",
+        message: `"${group.name}" was created`,
+        read: true,
+      });
+
       return res.status(201).json(group);
     }
 
@@ -301,6 +357,16 @@ export default async function handler(req, res) {
       if (result.length === 0) {
         return res.status(404).json({ error: "Budget not found" });
       }
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      const budgetLabel = result[0].category ? `"${result[0].category}"` : "whole-group";
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "budget_updated",
+        message: `${actor[0].name} updated the ${budgetLabel} budget to ${limitAmount}`,
+        read: true,
+      });
 
       return res.status(200).json(result[0]);
     }
@@ -333,6 +399,15 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: "Group not found" });
       }
 
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: bodyId,
+        type: "group_updated",
+        message: `${actor[0].name} updated the group settings`,
+        read: true,
+      });
+
       return res.status(200).json(result[0]);
     }
 
@@ -362,12 +437,23 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: "Member not found" });
       }
 
-      const groupForNotify = await sql`SELECT name FROM groups WHERE id = ${id}`;
+      const [groupForNotify, actor, target] = await Promise.all([
+        sql`SELECT name FROM groups WHERE id = ${id}`,
+        sql`SELECT name FROM users WHERE id = ${userId}`,
+        sql`SELECT name FROM users WHERE id = ${targetUserId}`,
+      ]);
       await createNotification(sql, {
         userId: targetUserId,
         groupId: id,
         type: "role_changed",
         message: `Your role in "${groupForNotify[0].name}" changed to ${role}`,
+      });
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "role_updated",
+        message: `${actor[0].name} changed ${target[0].name}'s role to ${role}`,
+        read: true,
       });
 
       return res.status(200).json(result[0]);
@@ -397,6 +483,8 @@ export default async function handler(req, res) {
         return res.status(409).json({ error: "Promote another member to owner before removing the last owner" });
       }
 
+      const target = await sql`SELECT name FROM users WHERE id = ${targetUserId}`;
+
       const result = await sql`
         DELETE FROM group_members WHERE group_id = ${id} AND user_id = ${targetUserId}
         RETURNING id
@@ -405,6 +493,18 @@ export default async function handler(req, res) {
       if (result.length === 0) {
         return res.status(404).json({ error: "Member not found" });
       }
+
+      const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
+      await createNotification(sql, {
+        userId,
+        groupId: id,
+        type: "member_removed",
+        message:
+          targetUserId === userId
+            ? `${actor[0].name} left the group`
+            : `${actor[0].name} removed ${target[0]?.name ?? "a member"} from the group`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Member removed" });
     }
@@ -427,10 +527,36 @@ export default async function handler(req, res) {
     if (req.method === "DELETE" && id) {
       await requireGroupOwner(sql, id, userId);
 
-      const result = await sql`DELETE FROM groups WHERE id = ${id} RETURNING id`;
-      if (result.length === 0) {
+      // notifications.group_id cascades on group delete, so any log entry tied to this
+      // group's id would vanish the instant it's deleted - log with groupId: null instead
+      // (naming the group in the message) so these survive on the recipients' personal
+      // Activity pages even though the group itself, and its own feed, are gone.
+      const [group, actor, otherMembers] = await Promise.all([
+        sql`SELECT name FROM groups WHERE id = ${id}`,
+        sql`SELECT name FROM users WHERE id = ${userId}`,
+        sql`SELECT user_id FROM group_members WHERE group_id = ${id} AND user_id != ${userId}`,
+      ]);
+      if (group.length === 0) {
         return res.status(404).json({ error: "Group not found" });
       }
+
+      for (const member of otherMembers) {
+        await createNotification(sql, {
+          userId: member.user_id,
+          groupId: null,
+          type: "group_deleted",
+          message: `${actor[0].name} deleted the group "${group[0].name}"`,
+        });
+      }
+      await createNotification(sql, {
+        userId,
+        groupId: null,
+        type: "group_deleted",
+        message: `You deleted the group "${group[0].name}"`,
+        read: true,
+      });
+
+      const result = await sql`DELETE FROM groups WHERE id = ${id} RETURNING id`;
 
       return res.status(200).json({ message: "Group deleted", id: result[0].id });
     }

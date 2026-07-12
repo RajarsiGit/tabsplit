@@ -38,10 +38,11 @@ A lightweight alternative to Splitwise for splitting recurring shared expenses w
   - Anyone who opens it (registering or logging in first, if needed) joins the group automatically
   - Regenerate to invalidate the old link, or revoke it entirely
 
-- **Notifications**
+- **Notifications & activity**
   - In-app notification bell in the sidebar, plus a full **Activity** page for browsing further back — no email required
   - Notified when you're added to a group, your role changes, a new expense or comment is logged, someone records a settlement with you or nudges you about one you owe, a group's budget is exceeded for the month, or you have an outstanding balance a weekly reminder job flags
   - Unread badge count, mark one or all as read
+  - Beyond notifications aimed at you, **every action you or anyone else takes is logged as activity** too — edits and deletes, category/budget changes, invite links, membership changes, and more — so your personal Activity page and each group's Settings → Activity section double as a full audit trail, not just a notification list. Your own actions show up already marked read, so they don't set off the bell badge
 
 - **Insights**
   - A group's **Insights** tab shows spend-by-category and paid-by-member bar charts, computed from that group's expenses

@@ -1,4 +1,5 @@
 import { getDb, requireAuth, setCors, clearAuthCookie } from "./_lib/db.js";
+import { createNotification } from "./notifications.js";
 
 // Groups where userId is the owner and no one else currently holds the owner role there.
 async function findSoleOwnedGroupIds(sql, userId) {
@@ -18,8 +19,27 @@ async function findSoleOwnedGroupIds(sql, userId) {
 // them goes with it); everything else the user is tied to elsewhere cascades away per the
 // ON DELETE CASCADE rules already defined in schema/schema.sql, leaving other groups intact.
 async function deleteAssociatedRecords(sql, userId) {
+  const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
   const soleOwnedGroupIds = await findSoleOwnedGroupIds(sql, userId);
+
   for (const groupId of soleOwnedGroupIds) {
+    // notifications.group_id cascades on group delete, so any entry tied to this group's id
+    // would vanish the instant it's deleted below - log with groupId: null (naming the group
+    // in the message) so surviving members still see it on their personal Activity page. The
+    // deleting user's own row (and cascade to their own notifications) is gone by the end of
+    // this function regardless, so there's no self-entry for them - an accepted limitation.
+    const [group, otherMembers] = await Promise.all([
+      sql`SELECT name FROM groups WHERE id = ${groupId}`,
+      sql`SELECT user_id FROM group_members WHERE group_id = ${groupId} AND user_id != ${userId}`,
+    ]);
+    for (const member of otherMembers) {
+      await createNotification(sql, {
+        userId: member.user_id,
+        groupId: null,
+        type: "group_deleted",
+        message: `${actor[0].name} deleted their account, which deleted the group "${group[0].name}"`,
+      });
+    }
     await sql`DELETE FROM groups WHERE id = ${groupId}`;
   }
   await sql`DELETE FROM users WHERE id = ${userId}`;
@@ -29,6 +49,7 @@ async function deleteAssociatedRecords(sql, userId) {
 // only member of) and scrubs the user row in place instead of deleting it, so shared
 // expenses/splits/settlements the user was part of keep showing correctly to other members.
 async function deleteOwnRecordsOnly(sql, userId) {
+  const actor = await sql`SELECT name FROM users WHERE id = ${userId}`;
   const soleOwnedGroupIds = await findSoleOwnedGroupIds(sql, userId);
 
   for (const groupId of soleOwnedGroupIds) {
@@ -44,10 +65,28 @@ async function deleteOwnRecordsOnly(sql, userId) {
         UPDATE group_members SET role = 'owner'
         WHERE group_id = ${groupId} AND user_id = ${nextOwner[0].user_id}
       `;
+      await createNotification(sql, {
+        userId: nextOwner[0].user_id,
+        groupId,
+        type: "ownership_transferred",
+        message: `You're now the owner - ${actor[0].name} left the group`,
+      });
     } else {
+      // Same cascade concern as deleteAssociatedRecords: nothing survives tied to this
+      // group_id once it's deleted, but there are no other members here to notify anyway.
       await sql`DELETE FROM groups WHERE id = ${groupId}`;
     }
   }
+
+  // The user row is scrubbed in place below, not deleted, so - unlike the hard-delete path -
+  // a self-log entry here does survive and will show on their (now placeholder) Activity page.
+  await createNotification(sql, {
+    userId,
+    groupId: null,
+    type: "account_scrubbed",
+    message: "You left all your groups and cleared your profile",
+    read: true,
+  });
 
   await sql`DELETE FROM group_members WHERE user_id = ${userId}`;
 
@@ -119,6 +158,14 @@ export default async function handler(req, res) {
         JOIN group_members gm ON gm.group_id = s.group_id AND gm.user_id = ${userId}
         ORDER BY s.group_id, s.settled_at
       `;
+
+      await createNotification(sql, {
+        userId,
+        groupId: null,
+        type: "data_exported",
+        message: "You exported your account data",
+        read: true,
+      });
 
       res.setHeader("Content-Disposition", 'attachment; filename="tabsplit-export.json"');
       return res.status(200).json({

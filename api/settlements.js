@@ -35,9 +35,10 @@ export default async function handler(req, res) {
       await requireGroupMember(sql, bodyGroupId, from);
       await requireGroupMember(sql, bodyGroupId, to);
 
-      const [group, creditor] = await Promise.all([
+      const [group, creditor, debtor] = await Promise.all([
         sql`SELECT name, currency FROM groups WHERE id = ${bodyGroupId}`,
         sql`SELECT name FROM users WHERE id = ${to}`,
+        sql`SELECT name FROM users WHERE id = ${from}`,
       ]);
 
       await createNotification(sql, {
@@ -45,6 +46,13 @@ export default async function handler(req, res) {
         groupId: bodyGroupId,
         type: "settle_up_nudge",
         message: `Reminder: you owe ${creditor[0].name} ${formatCurrency(amount, group[0].currency)} in ${group[0].name}`,
+      });
+      await createNotification(sql, {
+        userId,
+        groupId: bodyGroupId,
+        type: "settle_up_nudge_sent",
+        message: `Reminded ${debtor[0].name} about ${formatCurrency(amount, group[0].currency)} owed to ${creditor[0].name}`,
+        read: true,
       });
 
       return res.status(200).json({ message: "Reminder sent" });
@@ -98,6 +106,13 @@ export default async function handler(req, res) {
           message: `${actorName[0].name} recorded a settlement of ${amount}`,
         });
       }
+      await createNotification(sql, {
+        userId,
+        groupId: bodyGroupId,
+        type: "settlement_recorded",
+        message: `${actorName[0].name} recorded a settlement of ${amount}`,
+        read: true,
+      });
 
       return res.status(201).json(result[0]);
     }
@@ -112,6 +127,19 @@ export default async function handler(req, res) {
       await requireGroupMember(sql, existing[0].group_id, userId);
 
       await sql`DELETE FROM settlements WHERE id = ${id}`;
+
+      const [actor, fromUser, toUser] = await Promise.all([
+        sql`SELECT name FROM users WHERE id = ${userId}`,
+        sql`SELECT name FROM users WHERE id = ${existing[0].from_user}`,
+        sql`SELECT name FROM users WHERE id = ${existing[0].to_user}`,
+      ]);
+      await createNotification(sql, {
+        userId,
+        groupId: existing[0].group_id,
+        type: "settlement_removed",
+        message: `${actor[0].name} removed a settlement between ${fromUser[0].name} and ${toUser[0].name}`,
+        read: true,
+      });
 
       return res.status(200).json({ message: "Settlement removed", id: Number(id) });
     }

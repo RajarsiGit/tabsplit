@@ -12,6 +12,7 @@ import {
   clearOAuthStateCookie,
   OAUTH_STATE_COOKIE_NAME,
 } from "./_lib/db.js";
+import { createNotification } from "./notifications.js";
 
 const GITHUB_USER_AGENT = "TabSplit";
 
@@ -169,6 +170,14 @@ export default async function handler(req, res) {
           (github_id IS NOT NULL) AS has_github
       `;
 
+      await createNotification(sql, {
+        userId: decoded.userId,
+        groupId: null,
+        type: "profile_updated",
+        message: "You updated your profile",
+        read: true,
+      });
+
       return res.status(200).json({ user: result[0] });
     }
 
@@ -201,6 +210,14 @@ export default async function handler(req, res) {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       await sql`UPDATE users SET password = ${hashedPassword} WHERE id = ${decoded.userId}`;
 
+      await createNotification(sql, {
+        userId: decoded.userId,
+        groupId: null,
+        type: "password_changed",
+        message: existingHash ? "You changed your password" : "You set a password",
+        read: true,
+      });
+
       return res.status(200).json({ message: existingHash ? "Password updated" : "Password set" });
     }
 
@@ -221,6 +238,14 @@ export default async function handler(req, res) {
       }
 
       await sql`UPDATE users SET github_id = NULL WHERE id = ${decoded.userId}`;
+
+      await createNotification(sql, {
+        userId: decoded.userId,
+        groupId: null,
+        type: "github_unlinked",
+        message: "You disconnected GitHub",
+        read: true,
+      });
 
       return res.status(200).json({ message: "GitHub disconnected" });
     }
@@ -322,6 +347,13 @@ export default async function handler(req, res) {
           }
 
           await sql`UPDATE users SET github_id = ${githubId} WHERE id = ${existingAuth.userId}`;
+          await createNotification(sql, {
+            userId: existingAuth.userId,
+            groupId: null,
+            type: "github_linked",
+            message: "You connected GitHub",
+            read: true,
+          });
           return redirectTo(res, "/settings?linked=github");
         }
 
